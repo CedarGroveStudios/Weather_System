@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
-"""
-pyportal_corrosion_display.py
+""" pyportal_corrosion_display.py
 
-Receives AIO workshop conditions for monitoring potential corrosion
-conditions in the remote workshop. For the Adafruit PyPortal M4.
+Receives AIO corrosion conditions in support of remote workshop corrosion
+monitoring.
+
+For the Adafruit PyPortal M4
 """
 
 import time
@@ -292,7 +293,7 @@ def alert(text=""):
 last_weather_update = time.monotonic()
 update_display()  # Fetch initial data from AIO
 
-### Main loop ###
+### Main Loop ###
 while True:
     current_time = time.monotonic()
 
@@ -313,8 +314,4 @@ while True:
     display_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
     clock_digits.text = display_time
 
-    # A superfluous LCARS animation
-    pcb_temp.text = "°" * randint(1, 9)
-    time.sleep(0.5)
-    pcb_temp.text = "°" * randint(1, 9)
-    time.sleep(0.5)
+    time.sleep(1)
