@@ -14,21 +14,25 @@ import os
 import gc
 import displayio
 import digitalio
+import analogio
 import supervisor
 from random import randint
+from simpleio import map_range
 import adafruit_pyportal
 from adafruit_display_text.label import Label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_shapes.roundrect import RoundRect
 from adafruit_display_shapes.triangle import Triangle
+import adafruit_adt7410  # Integral I2C temperature sensor
+from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
 
 # Set display brightness for startup
 board.DISPLAY.brightness = 0
 
 # AIO Weather Receiver Parameters
 SAMPLE_INTERVAL = 120  # Check corrosion conditions (seconds)
-BRIGHTNESS = 0.25
+BRIGHTNESS = 0.75
 
 # fmt: off
 WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -51,6 +55,14 @@ pyportal.set_backlight(BRIGHTNESS)
 led = digitalio.DigitalInOut(board.LED)
 led.direction = digitalio.Direction.OUTPUT
 led.value = False
+
+# Instantiate the light sensor
+light_sensor = analogio.AnalogIn(board.LIGHT)
+
+# Instantiate the PCB temperature sensor
+corrosion_sensor = adafruit_adt7410.ADT7410(board.I2C())
+corrosion_sensor.reset = True  # Set the sensor to a known state
+corrosion_sensor.high_resolution = True
 
 # Load the text fonts from the fonts folder
 FONT_1 = bitmap_font.load_font("/fonts/OpenSans-9.bdf")
@@ -213,6 +225,7 @@ def update_display():
     """Fetch last values and update the display."""
     sensor_icon_mask.fill = None
 
+    pcb_temp.text = f"{read_pcb_temperature():.1f}°"
     temperature.text = f"{float(get_last_value("shop.int-temperature")):.1f}°"
     humidity.text = f"{float(get_last_value("shop.int-humidity")):.0f}%"
     dew_point.text = f"{float(get_last_value("shop.int-dewpoint")):.1f}° Dew"
@@ -290,6 +303,23 @@ def alert(text=""):
     return
 
 
+def adjust_brightness():
+    """Acquire the current lux light sensor value and adjust
+    display brightness. Full-scale raw light sensor value (65535)
+    is approximately 1100 Lux."""
+    raw = 0
+    for i in range(2000):
+        raw = raw + light_sensor.value
+    raw = raw / 2000
+    pyportal.set_backlight(map_range(raw / 65535 * 1100, 11, 20, 0.01, BRIGHTNESS))
+
+
+def read_pcb_temperature():
+        """Read the current PCB temperature value in degrees F"""
+        return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
+        return
+
+
 last_weather_update = time.monotonic()
 update_display()  # Fetch initial data from AIO
 
@@ -314,4 +344,5 @@ while True:
     display_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
     clock_digits.text = display_time
 
+    adjust_brightness()
     time.sleep(1)

@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
-"""
-pyportal_mikey_weather_display.py
+""" pyportal_mikey_weather_display.py
 
 Receives AIO local weather conditions.
+
 For the Adafruit PyPortal M4.
 """
 
@@ -13,8 +13,10 @@ import os
 import gc
 import displayio
 import digitalio
+import analogio
 import supervisor
 import adafruit_pyportal
+from simpleio import map_range
 from adafruit_display_text.label import Label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.roundrect import RoundRect
@@ -26,7 +28,7 @@ board.DISPLAY.brightness = 0
 
 # AIO Weather Receiver Parameters
 SAMPLE_INTERVAL = 1200  # Check conditions (seconds)
-BRIGHTNESS = 1.0
+BRIGHTNESS = 0.75
 SOUND = True
 ICON = True
 
@@ -53,6 +55,9 @@ if SOUND:
 led = digitalio.DigitalInOut(board.LED)
 led.direction = digitalio.Direction.OUTPUT
 led.value = False
+
+# Instantiate the light sensor
+light_sensor = analogio.AnalogIn(board.LIGHT)
 
 # Load the text fonts from the fonts folder
 SMALL_FONT = bitmap_font.load_font("/fonts/Arial-12.bdf")
@@ -263,6 +268,17 @@ def alert(text=""):
     return
 
 
+def adjust_brightness():
+    """Acquire the current lux light sensor value and adjust
+    display brightness. Full-scale raw light sensor value (65535)
+    is approximately 1100 Lux."""
+    raw = 0
+    for i in range(2000):
+        raw = raw + light_sensor.value
+    raw = raw / 2000
+    pyportal.set_backlight(map_range(raw / 65535 * 1100, 11, 20, 0.01, BRIGHTNESS))
+    
+
 last_weather_update = time.monotonic()
 alert("INITIALIZING")
 update_display()  # Fetch initial data from AIO
@@ -291,4 +307,5 @@ while True:
     display_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
     clock_digits.text = display_time
 
+    adjust_brightness()
     time.sleep(1)

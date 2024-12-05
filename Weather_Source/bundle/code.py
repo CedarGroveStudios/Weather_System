@@ -26,7 +26,8 @@ import adafruit_connection_manager
 import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
-import adafruit_ili9341
+import adafruit_ili9341  # 2.4" TFT FeatherWing
+# import adafruit_hx8357  # 3.5" TFT FeatherWing
 import adafruit_am2320  # I2C temperature/humidity sensor; indoor
 
 # import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
@@ -57,19 +58,23 @@ MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "
 # fmt: on
 
 ## Instantiate Local Peripherals
-# Instantiate the TFT Display
+# Instantiate the 2.4" TFT FeatherWing Display
 displayio.release_displays()  # Release display resources
-try:
-    display_bus = displayio.FourWire(
-        board.SPI(), command=board.D10, chip_select=board.D9, reset=None
-    )
-    display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
-    display.rotation = ROTATION
-    lite = pwmio.PWMOut(board.TX, frequency=500)
-    lite.duty_cycle = int(BRIGHTNESS * 0xFFFF)
-except Exception as display_error:
-    display = False
-    print(f"Display not connected: {display_error}")
+display_bus = displayio.FourWire(
+    board.SPI(), command=board.D10, chip_select=board.D9, reset=None
+)
+display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
+
+"""# Instantiate the 3.5" TFT FeatherWing Display
+displayio.release_displays()  # Release display resources
+display_bus = displayio.FourWire(
+    board.SPI(), command=board.D10, chip_select=board.D9, reset=None
+)
+display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)"""
+
+display.rotation = ROTATION
+lite = pwmio.PWMOut(board.TX, frequency=500)
+lite.duty_cycle = int(BRIGHTNESS * 0xFFFF)
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
