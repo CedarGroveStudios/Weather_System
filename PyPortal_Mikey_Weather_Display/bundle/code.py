@@ -269,14 +269,15 @@ def alert(text=""):
 
 
 def adjust_brightness():
-    """Acquire the current lux light sensor value and adjust
+    """Acquire the current lux light sensor value and gradually adjust
     display brightness. Full-scale raw light sensor value (65535)
     is approximately 1100 Lux."""
     raw = 0
     for i in range(2000):
         raw = raw + light_sensor.value
-    raw = raw / 2000
-    pyportal.set_backlight(map_range(raw / 65535 * 1100, 11, 20, 0.01, BRIGHTNESS))
+    target_bright = round(map_range(raw / 2000 / 65535 * 1100, 11, 20, 0.01, BRIGHTNESS), 3)
+    new_bright = board.DISPLAY.brightness + ((target_bright - board.DISPLAY.brightness) / 5)
+    pyportal.set_backlight(round(new_bright, 3))
     
 
 last_weather_update = time.monotonic()
