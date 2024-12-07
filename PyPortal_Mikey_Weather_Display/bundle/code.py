@@ -166,7 +166,7 @@ def get_last_value(feed_key):
         # print(f"throttle limit: {pyportal.network.io_client.get_remaining_throttle_limit()}")
         while pyportal.network.io_client.get_remaining_throttle_limit() <= 10:
             time.sleep(1)  # Wait until throttle limit increases
-        time.sleep(1)  # Wait after throttle check query to retrieve feed
+        # time.sleep(1)  # Wait after throttle check query to retrieve feed
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
         return last_value
     except (KeyError, IndexError, TimeoutError, BrokenPipeError, OSError) as e:
@@ -233,7 +233,7 @@ def update_display():
         icon_suffix = "d"
     else:
         icon_suffix = "n"
-    icon_file = f"/icons/{kit_to_map_icon[description.text][2]:02d}{icon_suffix}.bmp"
+    icon_file = f"/icons/{kit_to_map_icon[description.text][1]}{icon_suffix}.bmp"
     print(f"Icon filename: {icon_file}")
 
     if ICON:
@@ -278,7 +278,7 @@ def adjust_brightness():
     target_bright = round(map_range(raw / 2000 / 65535 * 1100, 11, 20, 0.01, BRIGHTNESS), 3)
     new_bright = board.DISPLAY.brightness + ((target_bright - board.DISPLAY.brightness) / 5)
     pyportal.set_backlight(round(new_bright, 3))
-    
+
 
 last_weather_update = time.monotonic()
 alert("INITIALIZING")
