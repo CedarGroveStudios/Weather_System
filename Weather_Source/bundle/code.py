@@ -26,10 +26,9 @@ import adafruit_connection_manager
 import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
-import adafruit_ili9341  # 2.4" TFT FeatherWing
-# import adafruit_hx8357  # 3.5" TFT FeatherWing
+# import adafruit_ili9341  # 2.4" TFT FeatherWing
+import adafruit_hx8357  # 3.5" TFT FeatherWing
 import adafruit_am2320  # I2C temperature/humidity sensor; indoor
-
 # import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
 import pwmio
 
@@ -44,12 +43,15 @@ XMIT_SENSOR:  True to read local sensor data and send to AIO feeds
               False to read sensor data and display locally
 """
 XMIT_WEATHER = True
-XMIT_SENSOR = False
+XMIT_SENSOR = True
 SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 
 # TFT Display Parameters
-BRIGHTNESS = 0.25
-ROTATION = 270
+BRIGHTNESS = 0.50
+ROTATION = 180
+
+# Cooling fan threshold
+FAN_ON_TRESHOLD_F = 100  # Degrees Farenheit
 
 # fmt: off
 # A couple of day/month lookup tables
@@ -58,23 +60,31 @@ MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "
 # fmt: on
 
 ## Instantiate Local Peripherals
-# Instantiate the 2.4" TFT FeatherWing Display
+"""# Instantiate the 2.4" TFT FeatherWing Display
 displayio.release_displays()  # Release display resources
 display_bus = displayio.FourWire(
     board.SPI(), command=board.D10, chip_select=board.D9, reset=None
 )
-display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
+display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)"""
 
-"""# Instantiate the 3.5" TFT FeatherWing Display
+# Instantiate the 3.5" TFT FeatherWing Display
 displayio.release_displays()  # Release display resources
 display_bus = displayio.FourWire(
     board.SPI(), command=board.D10, chip_select=board.D9, reset=None
 )
-display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)"""
+display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
 
 display.rotation = ROTATION
 lite = pwmio.PWMOut(board.TX, frequency=500)
 lite.duty_cycle = int(BRIGHTNESS * 0xFFFF)
+
+# Split the screen
+# supervisor.reset_terminal(display.width//2, display.height)
+
+# Instantiate cooling fan control (D5)
+fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
+fan.direction = digitalio.Direction.OUTPUT
+fan.value = False  # Initialize with fan off
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
@@ -136,11 +146,16 @@ def read_local_sensor():
     return temp_f, humid_pct, dew_f, corrosion_index
 
 
-# Function to print CPU temperature (ESP32-S3 has built-in temperature sensor)
-def cpu_temp():
-    """Read the ESP32-S3 internal CPU temperature sensor.
+def read_cpu_temp():
+    """Read the ESP32-S3 internal CPU temperature sensor and turn on
+    fan if threshold is exceeded.
     Nominal operating range is -40C to 85C (-40F to 185F)."""
-    return celsius_to_fahrenheit(microcontroller.cpu.temperature)
+    cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
+    if cpu_temp_f > FAN_ON_TRESHOLD_F:  # Turn on cooling fan if needed
+        fan.value = True
+    else:
+        fan.value = False
+    return cpu_temp_f
 
 
 def display_brightness(brightness=1.0):
@@ -273,13 +288,19 @@ while True:
     sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
     sens_heat = corrosion_sensor.heater
 
+    publish_to_aio(
+                int(round(time.monotonic() / 60, 0)),
+                "system-watchdog",
+                xmit=XMIT_SENSOR,
+            )
+
     # Publish local sensor data
     publish_to_aio(sens_temp, "shop.int-temperature", xmit=XMIT_SENSOR)
     publish_to_aio(sens_humid, "shop.int-humidity", xmit=XMIT_SENSOR)
     publish_to_aio(sens_dew_pt, "shop.int-dewpoint", xmit=XMIT_SENSOR)
     publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
-    publish_to_aio(f"{cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
+    publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
     print("-" * 35)
 
     # Receive and update the conditions from AIO+ Weather
@@ -329,6 +350,7 @@ while True:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
+        print(f"NOTE Cooling fan state: {fan.value}")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:
