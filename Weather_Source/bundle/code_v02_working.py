@@ -15,7 +15,6 @@ https://github.com/adafruit/Adafruit_CircuitPython_AdafruitIO/blob/main/examples
 import board
 import microcontroller
 import digitalio
-import displayio
 import gc
 import os
 import time
@@ -23,26 +22,28 @@ import rtc
 import ssl
 import supervisor
 import neopixel
+from adafruit_datetime import datetime
 import adafruit_connection_manager
 import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
 
-from adafruit_display_text.label import Label
-from adafruit_bitmap_font import bitmap_font
-from adafruit_display_shapes.rect import Rect
-from adafruit_display_shapes.roundrect import RoundRect
-from adafruit_display_shapes.triangle import Triangle
-
-# import adafruit_ili9341  # 2.4" TFT FeatherWing
-import adafruit_hx8357  # 3.5" TFT FeatherWing
 import adafruit_am2320  # I2C temperature/humidity sensor; indoor
 # import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
-import pwmio
 
 # Temperature Converter Helpers
 from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
 from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
+
+from v02_display_graphics import Display
+
+# TFT Display Parameters
+BRIGHTNESS = 0.50
+ROTATION = 180
+
+display = Display(rotation=ROTATION, brightness=BRIGHTNESS)
+
+TIMEZONE_OFFSET = -8
 
 """Operating Mode Parameters
 XMIT_WEATHER: True to read AIO+ Weather conditions and send to AIO feeds
@@ -54,10 +55,6 @@ XMIT_WEATHER = False
 XMIT_SENSOR = False
 SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 
-# TFT Display Parameters
-BRIGHTNESS = 0.50
-ROTATION = 180
-
 # Cooling fan threshold
 FAN_ON_TRESHOLD_F = 100  # Degrees Farenheit
 
@@ -66,39 +63,6 @@ FAN_ON_TRESHOLD_F = 100  # Degrees Farenheit
 WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", ]
 # fmt: on
-
-## Instantiate Local Peripherals
-"""# Instantiate the 2.4" TFT FeatherWing Display
-displayio.release_displays()  # Release display resources
-display_bus = displayio.FourWire(
-    board.SPI(), command=board.D10, chip_select=board.D9, reset=None
-)
-display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)"""
-
-# Instantiate the 3.5" TFT FeatherWing Display
-displayio.release_displays()  # Release display resources
-display_bus = displayio.FourWire(
-    board.SPI(), command=board.D6, chip_select=board.D5, reset=None
-)
-display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
-display.rotation = ROTATION
-
-# The board's integral display size
-WIDTH = display.width
-HEIGHT = display.height
-
-lite = pwmio.PWMOut(board.TX, frequency=500)
-lite.duty_cycle = int(BRIGHTNESS * 0xFFFF)
-
-# Split the screen
-# supervisor.reset_terminal(WIDTH//2, HEIGHT)
-
-# Load the text fonts from the fonts folder
-FONT_1 = bitmap_font.load_font("/fonts/OpenSans-9.bdf")
-FONT_2 = bitmap_font.load_font("/fonts/Arial-12.bdf")
-FONT_3 = bitmap_font.load_font("/fonts/Arial-Bold-24.bdf")
-CLOCK_FONT = bitmap_font.load_font("/fonts/Anton-Regular-104.bdf")
-TEST_FONT_1 = bitmap_font.load_font("/fonts/Helvetica-Bold-36.bdf")
 
 # Default colors
 BLACK = 0x000000
@@ -120,129 +84,6 @@ LCARS_LT_BLU = 0x1B6BA7
 message = ""
 corrosion_index = 0
 clock_tick = False
-
-# Define the display group
-image_group = displayio.Group()
-
-# Background Graphics; image_group[0]
-bkg_image = displayio.OnDiskBitmap("/corrosion_mon_bkg.bmp")
-bkg = displayio.TileGrid(bkg_image, pixel_shader=bkg_image.pixel_shader)
-image_group.append(bkg)
-
-display.root_group = image_group  # Load display
-
-### Define display graphic, label, and value areas
-# Interior Sensor Data Area Title
-title_1 = Label(FONT_1, text="Interior", color=CYAN)
-title_1.anchor_point = (0.5, 0.5)
-title_1.anchored_position = (252, 26)
-image_group.append(title_1)
-
-# Temperature
-temperature = Label(TEST_FONT_1, text=" ", color=WHITE)
-temperature.x = 210
-temperature.y = 50
-image_group.append(temperature)
-
-# Humidity
-humidity = Label(TEST_FONT_1, text=" ", color=WHITE)
-humidity.x = 210
-humidity.y = 85
-image_group.append(humidity)
-
-# Dew Point
-dew_point = Label(FONT_2, text=" ", color=WHITE)
-dew_point.x = 210
-dew_point.y = 110
-image_group.append(dew_point)
-
-
-# Exterior Sensor Data Area Title
-title_2 = Label(FONT_1, text="Exterior", color=CYAN)
-title_2.anchor_point = (0.5, 0.5)
-title_2.anchored_position = (410, 26)
-image_group.append(title_2)
-
-# Exterior Temperature
-ext_temp = Label(TEST_FONT_1, text=" ", color=WHITE)
-ext_temp.x = 368
-ext_temp.y = 50
-image_group.append(ext_temp)
-
-# Exterior Humidity
-ext_humid = Label(TEST_FONT_1, text=" ", color=WHITE)
-ext_humid.x = 368
-ext_humid.y = 85
-image_group.append(ext_humid)
-
-# Exterior Dew Point
-ext_dew = Label(FONT_2, text=" ", color=WHITE)
-ext_dew.x = 368
-ext_dew.y = 110
-image_group.append(ext_dew)
-
-
-# Clock Hour:Min
-clock_digits = Label(CLOCK_FONT, text=" ", color=WHITE)
-clock_digits.anchor_point = (0.5, 0.5)
-clock_digits.anchored_position = (198, 170)
-image_group.append(clock_digits)
-
-# Weekday, Month, Date, Year
-clock_day_mon_yr = Label(FONT_1, text=" ", color=WHITE)
-clock_day_mon_yr.anchor_point = (0.5, 0.5)
-clock_day_mon_yr.anchored_position = (198, 231)
-image_group.append(clock_day_mon_yr)
-
-# Project Message Area
-display_message = Label(FONT_1, text=" ", color=YELLOW)
-display_message.anchor_point = (0.5, 0.5)
-display_message.anchored_position = (158, 106)
-image_group.append(display_message)
-
-# Clock Activity Icon Mask
-clock_tick_mask = RoundRect(305, 227, 7, 8, 1, fill=VIOLET, outline=None, stroke=0)
-image_group.append(clock_tick_mask)
-
-# Corrosion Status Icon and Text
-status_icon = Triangle(155, 38, 185, 90, 125, 90, fill=LCARS_LT_BLU, outline=None)
-image_group.append(status_icon)
-
-status = Label(FONT_3, text=" ", color=None)
-status.anchor_point = (0.5, 0.5)
-status.anchored_position = (157, 68)
-image_group.append(status)
-
-# Temp/Humid Sensor Icon Mask
-sensor_icon_mask = Rect(4, 54, 41, 56, fill=LCARS_LT_BLU, outline=None, stroke=0)
-image_group.append(sensor_icon_mask)
-
-# Sensor Heater Icon Mask
-heater_icon_mask = Rect(4, 110, 41, 8, fill=LCARS_LT_BLU, outline=None, stroke=0)
-image_group.append(heater_icon_mask)
-
-# Clock Icon Mask
-clock_icon_mask = Rect(45, 54, 34, 56, fill=LCARS_LT_BLU, outline=None, stroke=0)
-image_group.append(clock_icon_mask)
-
-# SD Icon Mask
-sd_icon_mask = Rect(4, 156, 72, 31, fill=LCARS_LT_BLU, outline=None, stroke=0)
-image_group.append(sd_icon_mask)
-
-# Network Icon Mask
-wifi_icon_mask = Rect(4, 188, 72, 30, fill=LCARS_LT_BLU, outline=None, stroke=0)
-image_group.append(wifi_icon_mask)
-
-# PCB Temperature
-pcb_temp = Label(FONT_1, text="°", color=CYAN)
-pcb_temp.anchor_point = (0.5, 0.5)
-pcb_temp.anchored_position = (40, 231)
-image_group.append(pcb_temp)
-
-gc.collect()
-
-
-pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb"
 
 """# Instantiate cooling fan control (D5)
 fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
@@ -325,13 +166,6 @@ def read_cpu_temp():
     return cpu_temp_f
 
 
-def display_brightness(brightness=1.0):
-    """Set the TFT display brightness.
-    :param float brightness: The display brightness.
-      Defaults to full intensity (1.0)."""
-    lite.duty_cycle = int(brightness * 0xFFFF)
-
-
 def wind_direction(heading):
     """Provide a one or two character string representation of a compass
     heading value. Returns '--' if heading is None.
@@ -382,11 +216,11 @@ def busy(delay):
     for blinks in range(int(round(delay, 0))):
         start = time.monotonic()
         if clock_tick:
-            clock_tick_mask.fill = RED
+            display.clock_tick_mask.fill = RED
             led.value = True
             # pixel[0] = 0x808080
         else:
-            clock_tick_mask.fill = None
+            display.clock_tick_mask.fill = None
             led.value = False
             # pixel[0] = neo_color
         clock_tick = not clock_tick
@@ -399,9 +233,9 @@ def busy(delay):
             hour = 12
 
         local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
-        clock_digits.text = local_time
+        display.clock_digits.text = local_time
 
-        pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb"
+        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.1f}°"
 
         delay = max((1 - (time.monotonic() - start)), 0)
         time.sleep(delay)
@@ -409,8 +243,8 @@ def busy(delay):
 
 def update_local_time():
     #pixel[0] = 0xFFFF00  # Busy (yellow)
-    clock_icon_mask.fill = None
-    wifi_icon_mask.fill = None
+    display.clock_icon_mask.fill = None
+    display.wifi_icon_mask.fill = None
     try:
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
@@ -424,41 +258,20 @@ def update_local_time():
         hour = 12
 
     local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
-    clock_digits.text = local_time
+    display.clock_digits.text = local_time
 
     wday = time.localtime().tm_wday
     month = time.localtime().tm_mon
     day = time.localtime().tm_mday
     year = time.localtime().tm_year
-    clock_day_mon_yr.text = f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
-    print(clock_day_mon_yr.text)
+    display.clock_day_mon_yr.text = f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
+    print(display.clock_day_mon_yr.text)
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
     #pixel[0] = 0x00FFFF  # Normal (green)
-    clock_icon_mask.fill = LCARS_LT_BLU
-    wifi_icon_mask.fill = LCARS_LT_BLU
-
-
-def alert(text=""):
-    # Place alert message in clock message area. Default is the previous message.
-    msg_text = text[:20]
-    if msg_text == "" or msg_text is None:
-        msg_text = ""
-        display_message.text = msg_text
-    else:
-        print("ALERT: " + msg_text)
-        display_message.color = RED
-        display_message.text = msg_text
-        time.sleep(0.1)
-        display_message.color = YELLOW
-        time.sleep(0.1)
-        display_message.color = RED
-        time.sleep(0.1)
-        display_message.color = YELLOW
-        time.sleep(0.5)
-        display_message.color = None
-    return
+    display.clock_icon_mask.fill = LCARS_LT_BLU
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
 
 
 # Connect to Wi-Fi
@@ -507,16 +320,16 @@ while True:
     )
     print("-" * 35)
 
-    sensor_icon_mask.fill = None
+    display.sensor_icon_mask.fill = None
     # Read the local temperature and humidity sensor
     sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
     #sens_heat = corrosion_sensor.heater
     sens_heat = False
 
     #pcb_temp.text = f"{read_pcb_temperature():.1f}°"
-    temperature.text = f"{sens_temp:.1f}°"
-    humidity.text = f"{sens_humid:.0f}%"
-    dew_point.text = f"{sens_dew_pt:.1f}° Dew"
+    display.temperature.text = f"{sens_temp:.1f}°"
+    display.humidity.text = f"{sens_humid:.0f}%"
+    display.dew_point.text = f"{sens_dew_pt:.1f}°"
 
     publish_to_aio(
                 int(round(time.monotonic() / 60, 0)),
@@ -525,7 +338,7 @@ while True:
             )
 
     # Publish local sensor data
-    wifi_icon_mask.fill = None
+    display.wifi_icon_mask.fill = None
     publish_to_aio(sens_temp, "shop.int-temperature", xmit=XMIT_SENSOR)
     publish_to_aio(sens_humid, "shop.int-humidity", xmit=XMIT_SENSOR)
     publish_to_aio(sens_dew_pt, "shop.int-dewpoint", xmit=XMIT_SENSOR)
@@ -533,27 +346,27 @@ while True:
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
     publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
 
-     # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
+    # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
     if sens_index == 0:
-        status_icon.fill = LT_GRN
-        status.color = None
-        alert("NORMAL")
-        heater_icon_mask.fill = LCARS_LT_BLU
-        sensor_icon_mask.fill = LCARS_LT_BLU
+        display.status_icon.fill = LT_GRN
+        display.status.color = None
+        display.alert("NORMAL")
+        display.heater_icon_mask.fill = LCARS_LT_BLU
+        display.sensor_icon_mask.fill = LCARS_LT_BLU
     elif sens_index == 1:
-        status_icon.fill = YELLOW
-        status.color = RED
-        alert("CORROSION WARNING")
-        heater_icon_mask.fill = LCARS_LT_BLU
-        sensor_icon_mask.fill = LCARS_LT_BLU
+        display.status_icon.fill = YELLOW
+        display.status.color = RED
+        display.alert("CORROSION WARNING")
+        display.heater_icon_mask.fill = LCARS_LT_BLU
+        display.sensor_icon_mask.fill = LCARS_LT_BLU
     elif sens_index == 2:
-        status_icon.fill = RED
-        status.color = BLACK
-        alert("CORROSION ALERT")
-        heater_icon_mask.fill = None
-        sensor_icon_mask.fill = None
+        display.status_icon.fill = RED
+        display.status.color = BLACK
+        display.alert("CORROSION ALERT")
+        display.heater_icon_mask.fill = None
+        display.sensor_icon_mask.fill = None
 
-    wifi_icon_mask.fill = LCARS_LT_BLU
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
     print("-" * 35)
 
     # Receive and update the conditions from AIO+ Weather
@@ -562,7 +375,6 @@ while True:
         while io.get_remaining_throttle_limit() <= 2:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
-        weather_table = weather_table['current']  # extract a subset
         # print(weather_table)  # This is a very large json table
         # print("... weather table received ...")
         #pixel[0] = 0x00FF00  # Success (green)
@@ -574,6 +386,8 @@ while True:
         supervisor.reload()  # soft reset: keeps the terminal session alive
 
     if weather_table:
+        forecast_table = weather_table['forecast_days_1']  # for sunrise/sunset
+        weather_table = weather_table['current']  # extract a subset and reduce size
         if weather_table != weather_table_old:
             table_desc = weather_table["conditionCode"]
             table_temp = (
@@ -587,9 +401,35 @@ while True:
             table_timestamp = weather_table["metadata"]["readTime"]
             table_daylight = weather_table["daylight"]
 
-            ext_temp.text = f"{table_temp}°"
-            ext_humid.text = f"{table_humid[:-2]}%"
-            ext_dew.text = f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}° Dew"
+            display.ext_temp.text = f"{table_temp}°"
+            display.ext_humid.text = f"{table_humid[:-2]}%"
+            display.ext_dew.text = f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°"
+
+            display.ext_desc.text = table_desc
+
+            table_sunrise = datetime.fromisoformat(forecast_table['sunrise']).timetuple()
+            sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
+            if sunrise_hr < 0:
+                sunrise_hr = sunrise_hr + 24
+            if sunrise_hr > 12:
+                sunrise_hr = sunrise_hr - 12
+            if sunrise_hr == 0:
+                sunrise_hr = 12
+            display.ext_sunrise.text = f"rise {sunrise_hr:02d}:{table_sunrise.tm_min:02d}"
+
+            table_sunset = datetime.fromisoformat(forecast_table['sunset']).timetuple()
+            sunset_hr = table_sunset.tm_hour + os.getenv("TIMEZONE_OFFSET")
+            if sunset_hr < 0:
+                sunset_hr = sunset_hr + 24
+            if sunset_hr > 12:
+                sunset_hr = sunset_hr - 12
+            if sunset_hr == 0:
+                sunset_hr = 12
+            display.ext_sunset.text = f"set  {sunset_hr:02d}:{table_sunset.tm_min:02d}"
+
+            # Build a composite feed value
+            composite_tuple = f"{str(table_daylight)},{display.ext_sunrise.text[-5:]},{display.ext_sunset.text[-5:]}"
+            #print(composite_tuple)
 
             # Publish table data
             publish_to_aio(
@@ -604,6 +444,12 @@ while True:
             publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
             publish_to_aio(table_wind_speed, "weather-windspeed", xmit=XMIT_WEATHER)
             publish_to_aio(str(table_daylight), "weather-daylight", xmit=XMIT_WEATHER)
+
+            """# Test of composite feed value
+            publish_to_aio(composite_tuple, "weather-daylight", xmit=True)
+            #print(dir(io))
+            feed_value = io.receive_data("weather-daylight")["value"].split(",")
+            print("***", feed_value[0], feed_value[1], feed_value[2])"""
 
             weather_table_old = weather_table  # to watch for changes
         else:
