@@ -78,7 +78,7 @@ VIOLET = 0x9900FF
 DK_VIO = 0x110022
 WHITE = 0xFFFFFF
 GRAY = 0x444455
-LCARS_LT_BLU = 0x1B6BA7
+LCARS_LT_BLU = 0x07A2FF
 
 # Start-up values
 message = ""
@@ -216,7 +216,7 @@ def busy(delay):
     for blinks in range(int(round(delay, 0))):
         start = time.monotonic()
         if clock_tick:
-            display.clock_tick_mask.fill = RED
+            display.clock_tick_mask.fill = YELLOW
             led.value = True
             # pixel[0] = 0x808080
         else:
@@ -276,6 +276,7 @@ def update_local_time():
 
 # Connect to Wi-Fi
 try:
+    display.wifi_icon_mask.fill = None
     # Connect to Wi-Fi access point
     print(f"Connect to {os.getenv('CIRCUITPY_WIFI_SSID')}")
     wifi.radio.connect(
@@ -283,6 +284,7 @@ try:
     )
     #pixel[0] = 0x00FF00  # Success (green)
     print("  CONNECTED to WiFi")
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as wifi_access_error:
     #pixel[0] = 0xFF0000  # Error (red)
     print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
@@ -300,9 +302,11 @@ weather_table_old = None
 print("Connecting to the AIO HTTP service")
 # Initialize a socket pool and requests session
 try:
+    display.wifi_icon_mask.fill = None
     pool = adafruit_connection_manager.get_radio_socketpool(wifi.radio)
     requests = adafruit_requests.Session(pool, ssl.create_default_context())
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as aio_client_error:
     #pixel[0] = 0xFF0000  # Error (red)
     print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
@@ -322,6 +326,9 @@ while True:
 
     display.sensor_icon_mask.fill = None
     # Read the local temperature and humidity sensor
+    display.temp_mask.fill = BLACK
+    display.humid_mask.fill = BLACK
+    display.dew_pt_mask.fill = BLACK
     sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
     #sens_heat = corrosion_sensor.heater
     sens_heat = False
@@ -345,6 +352,10 @@ while True:
     publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
     publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
+    
+    display.temp_mask.fill = None
+    display.humid_mask.fill = None
+    display.dew_pt_mask.fill = None
 
     # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
     if sens_index == 0:
@@ -371,6 +382,7 @@ while True:
 
     # Receive and update the conditions from AIO+ Weather
     try:
+        display.wifi_icon_mask.fill = None
         #pixel[0] = 0xFFFF00  # AIO+ Weather fetch in progress (yellow)
         while io.get_remaining_throttle_limit() <= 2:
             time.sleep(1)  # Wait until throttle limit increases
@@ -378,6 +390,7 @@ while True:
         # print(weather_table)  # This is a very large json table
         # print("... weather table received ...")
         #pixel[0] = 0x00FF00  # Success (green)
+        display.wifi_icon_mask.fill = LCARS_LT_BLU
     except Exception as receive_weather_error:
         #pixel[0] = 0xFF0000  # Error (red)
         print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
@@ -390,20 +403,26 @@ while True:
         weather_table = weather_table['current']  # extract a subset and reduce size
         if weather_table != weather_table_old:
             table_desc = weather_table["conditionCode"]
+            display.temp_mask.fill = BLACK
             table_temp = (
                 f"{celsius_to_fahrenheit(weather_table['temperature']):.1f}"
             )
+            display.humid_mask.fill = BLACK
             table_humid = f"{weather_table['humidity'] * 100:.1f}"
+            display.dew_pt_mask.fill = BLACK
             table_dew_point = f"{weather_table['temperatureDewPoint']:.1f}"
-            table_wind_speed = f"{weather_table['windSpeed'] * 0.6214:.1f}"
+            table_wind_speed = f"{weather_table['windSpeed'] * 0.6214:.0f}"
             table_wind_dir = wind_direction(weather_table["windDirection"])
-            table_wind_gusts = f"{weather_table['windGust'] * 0.6214:.1f}"
+            table_wind_gusts = f"{weather_table['windGust'] * 0.6214:.0f}"
             table_timestamp = weather_table["metadata"]["readTime"]
             table_daylight = weather_table["daylight"]
 
             display.ext_temp.text = f"{table_temp}°"
             display.ext_humid.text = f"{table_humid[:-2]}%"
             display.ext_dew.text = f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°"
+            display.dew_pt_mask.fill = None
+            display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
+            display.ext_gusts.text = table_wind_gusts
 
             display.ext_desc.text = table_desc
 
@@ -439,10 +458,14 @@ while True:
             )
             publish_to_aio(table_desc, "weather-description", xmit=XMIT_WEATHER)
             publish_to_aio(table_humid, "weather-humidity", xmit=XMIT_WEATHER)
+            display.humid_mask.fill = None
             publish_to_aio(table_temp, "weather-temperature", xmit=XMIT_WEATHER)
+            display.temp_mask.fill = None
             publish_to_aio(table_wind_dir, "weather-winddirection", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
             publish_to_aio(table_wind_speed, "weather-windspeed", xmit=XMIT_WEATHER)
+            display.wind_mask.fill = None
+            publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
+            display.gusts_mask.fill = None
             publish_to_aio(str(table_daylight), "weather-daylight", xmit=XMIT_WEATHER)
 
             """# Test of composite feed value

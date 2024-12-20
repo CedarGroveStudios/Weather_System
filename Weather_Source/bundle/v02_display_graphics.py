@@ -34,6 +34,7 @@ BLACK        = 0x000000
 GRAY         = 0x444455
 WHITE        = 0xFFFFFF
 RED          = 0xFF0000
+PINK         = 0XEF5CA4
 ORANGE       = 0xFF8811
 YELLOW       = 0xFFFF00
 GREEN        = 0x00FF00
@@ -41,9 +42,11 @@ LT_GRN       = 0x00BB00
 CYAN         = 0x00FFFF
 BLUE         = 0x0000FF
 LT_BLUE      = 0x000044
-LCARS_LT_BLU = 0x1B6BA7
+LCARS_LT_BLU = 0x07A2FF
 VIOLET       = 0x9900FF
 DK_VIO       = 0x110022
+WIND         = 0x00e7ce
+GUSTS        = 0xfd614a
 # fmt: on
 
 
@@ -78,13 +81,12 @@ class Display:
 
         self.width = self._display.width
         self.height = self._display.height
-
-        # Load the text fonts from the fonts folder
-        FONT_1 = bitmap_font.load_font("/fonts/OpenSans-9.bdf")
-        FONT_2 = bitmap_font.load_font("/fonts/Arial-12.bdf")
-        FONT_3 = bitmap_font.load_font("/fonts/Arial-Bold-24.bdf")
-        CLOCK_FONT = bitmap_font.load_font("/fonts/Anton-Regular-104.bdf")
-        TEST_FONT_1 = bitmap_font.load_font("/fonts/Helvetica-Bold-36.bdf")
+        
+        from font_orbitron_bold_webfont_14 import FONT as ORBITRON_BOLD_14
+        from font_orbitron_bold_webfont_18 import FONT as ORBITRON_BOLD_18
+        from font_orbitron_bold_webfont_24 import FONT as ORBITRON_BOLD_24
+        from font_orbitron_bold_webfont_48 import FONT as ORBITRON_BOLD_48
+        from font_orbitron_light_webfont_12 import FONT as ORBITRON_LIGHT_12
 
         # Define the display group
         image_group = displayio.Group()
@@ -96,103 +98,12 @@ class Display:
 
         self._display.root_group = image_group  # Load display
 
-        ### Define display graphic, label, and value areas
-        """# Interior Sensor Data Area Title
-        self.title_1 = Label(FONT_1, text="Interior", color=CYAN)
-        self.title_1.anchor_point = (0.5, 0.5)
-        self.title_1.anchored_position = (252, 26)
-        image_group.append(self.title_1)"""
-
-        # Temperature
-        self.temperature = Label(FONT_3, text=" ", color=WHITE)
-        self.temperature.x = 50
-        self.temperature.y = 90
-        image_group.append(self.temperature)
-
-        # Humidity
-        self.humidity = Label(FONT_2, text=" ", color=WHITE)
-        self.humidity.x = 50
-        self.humidity.y = 115
-        image_group.append(self.humidity)
-
-        # Dew Point
-        self.dew_point = Label(FONT_2, text=" ", color=WHITE)
-        self.dew_point.x = 50
-        self.dew_point.y = 135
-        image_group.append(self.dew_point)
-
-        """# Exterior Sensor Data Area Title
-        self.title_2 = Label(FONT_1, text="Exterior", color=CYAN)
-        self.title_2.anchor_point = (0.5, 0.5)
-        self.title_2.anchored_position = (410, 26)
-        image_group.append(self.title_2)"""
-
-        # Exterior Temperature
-        self.ext_temp = Label(FONT_3, text=" ", color=WHITE)
-        self.ext_temp.x = 140
-        self.ext_temp.y = 90
-        image_group.append(self.ext_temp)
-
-        # Exterior Humidity
-        self.ext_humid = Label(FONT_2, text=" ", color=WHITE)
-        self.ext_humid.x = 140
-        self.ext_humid.y = 115
-        image_group.append(self.ext_humid)
-
-        # Exterior Dew Point
-        self.ext_dew = Label(FONT_2, text=" ", color=WHITE)
-        self.ext_dew.x = 140
-        self.ext_dew.y = 135
-        image_group.append(self.ext_dew)
-
-        # Exterior Description
-        self.ext_desc = Label(FONT_1, text=" ", color=WHITE)
-        self.ext_desc.anchor_point = (0.5, 0.5)
-        self.ext_desc.anchored_position = (95, 285)
-        image_group.append(self.ext_desc)
-
-        # Exterior Sunrise
-        self.ext_sunrise = Label(FONT_1, text=" ", color=YELLOW)
-        self.ext_sunrise.x = 330
-        self.ext_sunrise.y = 205
-        image_group.append(self.ext_sunrise)
-
-        # Exterior Sunset
-        self.ext_sunset = Label(FONT_1, text=" ", color=ORANGE)
-        self.ext_sunset.x = 405
-        self.ext_sunset.y = 205
-        image_group.append(self.ext_sunset)
-
-        # Clock Hour:Min
-        self.clock_digits = Label(TEST_FONT_1, text=" ", color=WHITE)
-        self.clock_digits.anchor_point = (0.5, 0.5)
-        self.clock_digits.anchored_position = (400, 135)
-        image_group.append(self.clock_digits)
-
-        # Weekday, Month, Date, Year
-        self.clock_day_mon_yr = Label(FONT_1, text=" ", color=WHITE)
-        self.clock_day_mon_yr.anchor_point = (0.5, 0.5)
-        self.clock_day_mon_yr.anchored_position = (400, 190)
-        image_group.append(self.clock_day_mon_yr)
-
-        # Project Message Area
-        self.display_message = Label(FONT_2, text=" ", color=YELLOW)
-        self.display_message.anchor_point = (0.5, 0.5)
-        self.display_message.anchored_position = (260, 303)
-        image_group.append(self.display_message)
-
+        ### Define display graphic, label, and mask areas
+        
+        ## Define masks
         # Clock Activity Icon Mask
-        self.clock_tick_mask = RoundRect(460, 300, 7, 8, 1, fill=VIOLET, outline=None, stroke=0)
+        self.clock_tick_mask = RoundRect(458, 299, 10, 10, 1, fill=VIOLET, outline=None, stroke=0)
         image_group.append(self.clock_tick_mask)
-
-        # Corrosion Status Icon and Text
-        self.status_icon = Triangle(95, 155, 135, 215, 55, 215, fill=LCARS_LT_BLU, outline=None)
-        image_group.append(self.status_icon)
-
-        self.status = Label(FONT_1, text="status", color=WHITE)
-        self.status.anchor_point = (0.5, 0.5)
-        self.status.anchored_position = (95, 200)
-        image_group.append(self.status)
 
         # Temp/Humid Sensor Icon Mask
         self.sensor_icon_mask = Rect(370, 20, 20, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
@@ -213,11 +124,117 @@ class Display:
         # Network Icon Mask
         self.wifi_icon_mask = Rect(420, 230, 40, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
         image_group.append(self.wifi_icon_mask)
+        
+        # Data Status Masks
+        self.temp_mask = Rect(295, 83, 20, 18, fill=None, outline=None, stroke=0)
+        image_group.append(self.temp_mask)
+        self.humid_mask = Rect(295, 105, 20, 18, fill=None, outline=None, stroke=0)
+        image_group.append(self.humid_mask)
+        self.dew_pt_mask = Rect(295, 127, 20, 18, fill=None, outline=None, stroke=0)
+        image_group.append(self.dew_pt_mask)
+        self.wind_mask = Rect(295, 172, 20, 18, fill=None, outline=None, stroke=0)
+        image_group.append(self.wind_mask)
+        self.gusts_mask = Rect(295, 194, 20, 18, fill=None, outline=None, stroke=0)
+        image_group.append(self.gusts_mask)
+        
+        # Corrosion Status Icon and Text
+        self.status_icon = Triangle(95, 155, 135, 215, 55, 215, fill=LCARS_LT_BLU, outline=None)
+        image_group.append(self.status_icon)
+        
+        self.status = Label(ORBITRON_LIGHT_12, text="status", color=WHITE)
+        self.status.anchor_point = (0.5, 0.5)
+        self.status.anchored_position = (95, 200)
+        image_group.append(self.status)
+        
+        ## Define text labels
+        # Temperature
+        self.temperature = Label(ORBITRON_BOLD_24, text=" ", color=WHITE)
+        self.temperature.anchor_point = (1.0, 0.5)
+        self.temperature.anchored_position = (120, 90)
+        image_group.append(self.temperature)
+
+        # Humidity
+        self.humidity = Label(ORBITRON_BOLD_18, text=" ", color=CYAN)
+        self.humidity.anchor_point = (1.0, 0.5)
+        self.humidity.anchored_position = (120, 115)
+        image_group.append(self.humidity)
+
+        # Dew Point
+        self.dew_point = Label(ORBITRON_BOLD_18, text=" ", color=PINK)
+        self.dew_point.anchor_point = (1.0, 0.5)
+        self.dew_point.anchored_position = (120, 137)
+        image_group.append(self.dew_point)
+
+        # Exterior Temperature
+        self.ext_temp = Label(ORBITRON_BOLD_24, text=" ", color=WHITE)
+        self.ext_temp.anchor_point = (1.0, 0.5)
+        self.ext_temp.anchored_position = (210, 90)
+        image_group.append(self.ext_temp)
+
+        # Exterior Humidity
+        self.ext_humid = Label(ORBITRON_BOLD_18, text=" ", color=CYAN)
+        self.ext_humid.anchor_point = (1.0, 0.5)
+        self.ext_humid.anchored_position = (210, 115)
+        image_group.append(self.ext_humid)
+
+        # Exterior Dew Point
+        self.ext_dew = Label(ORBITRON_BOLD_18, text=" ", color=PINK)
+        self.ext_dew.anchor_point = (1.0, 0.5)
+        self.ext_dew.anchored_position = (210, 137)
+        image_group.append(self.ext_dew)
+        
+        # Exterior Wind Speed
+        self.ext_wind = Label(ORBITRON_BOLD_18, text=" ", color=WIND)
+        self.ext_wind.anchor_point = (1.0, 0.5)
+        self.ext_wind.anchored_position = (210, 181)
+        image_group.append(self.ext_wind)
+        
+        # Exterior Wind Gusts
+        self.ext_gusts = Label(ORBITRON_BOLD_18, text=" ", color=GUSTS)
+        self.ext_gusts.anchor_point = (1.0, 0.5)
+        self.ext_gusts.anchored_position = (210, 203)
+        image_group.append(self.ext_gusts)
+
+        # Exterior Description
+        self.ext_desc = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
+        self.ext_desc.anchor_point = (0.5, 0.5)
+        self.ext_desc.anchored_position = (95, 285)
+        image_group.append(self.ext_desc)
+
+        # Exterior Sunrise
+        self.ext_sunrise = Label(ORBITRON_LIGHT_12, text=" ", color=YELLOW)
+        self.ext_sunrise.x = 325
+        self.ext_sunrise.y = 200
+        image_group.append(self.ext_sunrise)
+
+        # Exterior Sunset
+        self.ext_sunset = Label(ORBITRON_LIGHT_12, text=" ", color=ORANGE)
+        self.ext_sunset.x = 405
+        self.ext_sunset.y = 200
+        image_group.append(self.ext_sunset)
+
+        # Clock Hour:Min
+        self.clock_digits = Label(ORBITRON_BOLD_48, text=" ", color=WHITE)
+        self.clock_digits.anchor_point = (0.5, 0.5)
+        self.clock_digits.anchored_position = (390, 135)
+        image_group.append(self.clock_digits)
+
+        # Weekday, Month, Date, Year
+        self.clock_day_mon_yr = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
+        self.clock_day_mon_yr.anchor_point = (0.5, 0.5)
+        self.clock_day_mon_yr.anchored_position = (390, 175)
+        image_group.append(self.clock_day_mon_yr)
+
+        # Project Message Area
+        self.display_message = Label(ORBITRON_BOLD_14, text=" ", color=YELLOW)
+        self.display_message.anchor_point = (0.5, 0.5)
+        self.display_message.anchored_position = (390, 100)
+        image_group.append(self.display_message)
 
         # PCB Temperature
-        self.pcb_temp = Label(FONT_1, text="°", color=CYAN)
+        self.pcb_temp = Label(ORBITRON_LIGHT_12, text="°", color=CYAN)
         self.pcb_temp.anchor_point = (0.5, 0.5)
-        self.pcb_temp.anchored_position = (400, 303)
+        self.pcb_temp.anchored_position = (390, 303)
         image_group.append(self.pcb_temp)
 
         gc.collect()
