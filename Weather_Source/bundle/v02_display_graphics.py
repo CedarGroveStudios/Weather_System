@@ -81,7 +81,7 @@ class Display:
 
         self.width = self._display.width
         self.height = self._display.height
-        
+
         from font_orbitron_bold_webfont_14 import FONT as ORBITRON_BOLD_14
         from font_orbitron_bold_webfont_18 import FONT as ORBITRON_BOLD_18
         from font_orbitron_bold_webfont_24 import FONT as ORBITRON_BOLD_24
@@ -92,17 +92,21 @@ class Display:
         image_group = displayio.Group()
 
         # Background Image; image_group[0]
-        bkg_image = displayio.OnDiskBitmap("/LCARS_Weather_v025_480x320.bmp")
+        bkg_image = displayio.OnDiskBitmap("/LCARS_Weather_v026_480x320.bmp")
         bkg = displayio.TileGrid(bkg_image, pixel_shader=bkg_image.pixel_shader)
         image_group.append(bkg)
 
         self._display.root_group = image_group  # Load display
 
+        desc_icon = displayio.OnDiskBitmap("/images/02n_120x50.bmp")
+        icon = displayio.TileGrid(desc_icon, pixel_shader=desc_icon.pixel_shader, x=29, y=225)
+        image_group.append(icon)
+
         ### Define display graphic, label, and mask areas
-        
+
         ## Define masks
-        # Clock Activity Icon Mask
-        self.clock_tick_mask = RoundRect(458, 299, 10, 10, 1, fill=VIOLET, outline=None, stroke=0)
+        # Heartbeat Icon Mask
+        self.clock_tick_mask = RoundRect(458, 297, 10, 11, 1, fill=VIOLET, outline=None, stroke=0)
         image_group.append(self.clock_tick_mask)
 
         # Temp/Humid Sensor Icon Mask
@@ -117,16 +121,16 @@ class Display:
         self.clock_icon_mask = Rect(405, 20, 50, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
         image_group.append(self.clock_icon_mask)
 
-        # SD Icon Mask
-        self.sd_icon_mask = Rect(380, 230, 40, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        # SD Icon Mask; Also Masks Battery and Speaker Icons
+        self.sd_icon_mask = Rect(330, 225, 90, 55, fill=LCARS_LT_BLU, outline=None, stroke=0)
         image_group.append(self.sd_icon_mask)
 
         # Network Icon Mask
         self.wifi_icon_mask = Rect(420, 230, 40, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
         image_group.append(self.wifi_icon_mask)
-        
+
         # Data Status Masks
-        self.temp_mask = Rect(295, 83, 20, 18, fill=None, outline=None, stroke=0)
+        self.temp_mask = Rect(295, 82, 20, 18, fill=None, outline=None, stroke=0)
         image_group.append(self.temp_mask)
         self.humid_mask = Rect(295, 105, 20, 18, fill=None, outline=None, stroke=0)
         image_group.append(self.humid_mask)
@@ -136,16 +140,16 @@ class Display:
         image_group.append(self.wind_mask)
         self.gusts_mask = Rect(295, 194, 20, 18, fill=None, outline=None, stroke=0)
         image_group.append(self.gusts_mask)
-        
+
         # Corrosion Status Icon and Text
-        self.status_icon = Triangle(95, 155, 135, 215, 55, 215, fill=LCARS_LT_BLU, outline=None)
+        self.status_icon = Triangle(95, 155, 130, 210, 60, 210, fill=LCARS_LT_BLU, outline=None)
         image_group.append(self.status_icon)
-        
-        self.status = Label(ORBITRON_LIGHT_12, text="status", color=WHITE)
+
+        self.status = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
         self.status.anchor_point = (0.5, 0.5)
         self.status.anchored_position = (95, 200)
         image_group.append(self.status)
-        
+
         ## Define text labels
         # Temperature
         self.temperature = Label(ORBITRON_BOLD_24, text=" ", color=WHITE)
@@ -182,13 +186,13 @@ class Display:
         self.ext_dew.anchor_point = (1.0, 0.5)
         self.ext_dew.anchored_position = (210, 137)
         image_group.append(self.ext_dew)
-        
+
         # Exterior Wind Speed
         self.ext_wind = Label(ORBITRON_BOLD_18, text=" ", color=WIND)
         self.ext_wind.anchor_point = (1.0, 0.5)
         self.ext_wind.anchored_position = (210, 181)
         image_group.append(self.ext_wind)
-        
+
         # Exterior Wind Gusts
         self.ext_gusts = Label(ORBITRON_BOLD_18, text=" ", color=GUSTS)
         self.ext_gusts.anchor_point = (1.0, 0.5)
@@ -234,7 +238,7 @@ class Display:
         # PCB Temperature
         self.pcb_temp = Label(ORBITRON_LIGHT_12, text="°", color=CYAN)
         self.pcb_temp.anchor_point = (0.5, 0.5)
-        self.pcb_temp.anchored_position = (390, 303)
+        self.pcb_temp.anchored_position = (390, 302)
         image_group.append(self.pcb_temp)
 
         gc.collect()

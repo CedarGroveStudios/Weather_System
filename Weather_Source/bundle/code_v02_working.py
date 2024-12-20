@@ -352,7 +352,7 @@ while True:
     publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
     publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
-    
+
     display.temp_mask.fill = None
     display.humid_mask.fill = None
     display.dew_pt_mask.fill = None
@@ -360,19 +360,22 @@ while True:
     # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
     if sens_index == 0:
         display.status_icon.fill = LT_GRN
-        display.status.color = None
+        display.status.color = BLACK
+        display.status.text = "OK"
         display.alert("NORMAL")
         display.heater_icon_mask.fill = LCARS_LT_BLU
         display.sensor_icon_mask.fill = LCARS_LT_BLU
     elif sens_index == 1:
         display.status_icon.fill = YELLOW
         display.status.color = RED
+        display.status.text = "WARN"
         display.alert("CORROSION WARNING")
         display.heater_icon_mask.fill = LCARS_LT_BLU
         display.sensor_icon_mask.fill = LCARS_LT_BLU
     elif sens_index == 2:
         display.status_icon.fill = RED
         display.status.color = BLACK
+        display.status.text = "ALERT"
         display.alert("CORROSION ALERT")
         display.heater_icon_mask.fill = None
         display.sensor_icon_mask.fill = None
@@ -411,8 +414,10 @@ while True:
             table_humid = f"{weather_table['humidity'] * 100:.1f}"
             display.dew_pt_mask.fill = BLACK
             table_dew_point = f"{weather_table['temperatureDewPoint']:.1f}"
+            display.wind_mask.fill = BLACK
             table_wind_speed = f"{weather_table['windSpeed'] * 0.6214:.0f}"
             table_wind_dir = wind_direction(weather_table["windDirection"])
+            display.gusts_mask.fill = BLACK
             table_wind_gusts = f"{weather_table['windGust'] * 0.6214:.0f}"
             table_timestamp = weather_table["metadata"]["readTime"]
             table_daylight = weather_table["daylight"]
