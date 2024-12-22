@@ -100,7 +100,7 @@ class Display:
 
         self._display.root_group = self.image_group  # Load display
 
-        desc_icon = displayio.OnDiskBitmap("/icons/50d_120x50.bmp")
+        desc_icon = displayio.OnDiskBitmap("/cedar_grove_blue_120x50.bmp")
         icon = displayio.TileGrid(desc_icon, pixel_shader=desc_icon.pixel_shader, x=29, y=225)
         self.image_group.append(icon)
 
