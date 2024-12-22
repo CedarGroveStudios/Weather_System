@@ -123,9 +123,9 @@ def read_local_sensor():
         humid_pct = min(max(humid_pct, 0), 100)  # constrain value
         humid_pct = round(humid_pct, 1)"""
 
-    temp_c = 0
-    temp_f = 32
-    humid_pct = 44
+    temp_c = 17.1
+    temp_f = 62.8
+    humid_pct = 42
 
     # Calculate dew point values
     if None in (temp_c, humid_pct):
@@ -428,7 +428,8 @@ while True:
             display.dew_pt_mask.fill = None
             display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
             display.ext_gusts.text = table_wind_gusts
-
+            
+            display.display_icon(table_desc, "True")
             display.ext_desc.text = table_desc
 
             table_sunrise = datetime.fromisoformat(forecast_table['sunrise']).timetuple()
