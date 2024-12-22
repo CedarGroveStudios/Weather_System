@@ -100,7 +100,7 @@ def get_last_value(feed_key):
             time.sleep(1)  # Wait until throttle limit increases
         last_value = mp.network.io_client.receive_data(feed_key)["value"]
         return last_value
-    except (KeyError, IndexError) as e:
+    except Exception as e:
         print(f"Error fetching data from feed {feed_key}: {e}")
 
 

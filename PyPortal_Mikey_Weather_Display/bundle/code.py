@@ -169,7 +169,7 @@ def get_last_value(feed_key):
         # time.sleep(1)  # Wait after throttle check query to retrieve feed
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
         return last_value
-    except (KeyError, IndexError, TimeoutError, BrokenPipeError, OSError, RuntimeError) as e:
+    except Exception as e:
         # 372, 376 in adafruit_esp32spi._wait_spi_char
         print(f"Error fetching data from feed {feed_key}: {e}")
         print("  MCU will soft reset in 30 seconds.")
