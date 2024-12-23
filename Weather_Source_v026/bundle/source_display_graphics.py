@@ -1,15 +1,11 @@
 # SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
-cedargrove_weather_source_http.py WORKING VERSION
+source_display_graphics.py
 
-Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
-remote receivers, specifically in support of remote workshop corrosion
-monitoring.
+Builds the display graphics class for the Weather Source device.
 
 For the ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing
-
-https://github.com/adafruit/Adafruit_CircuitPython_AdafruitIO/blob/main/examples/adafruit_io_http/adafruit_io_weather.py
 """
 
 import board
@@ -282,8 +278,13 @@ class Display:
         self.display.rotation = rot
 
 
-    def display_icon(self, desc="Clear", daylight="True"):
-        if daylight == "True":
+    def display_icon(self, desc="Clear", daylight=True):
+        if isinstance(daylight, str):
+            if daylight == "True":
+                daylight = True
+            else:
+                daylight = False
+        if daylight:
             icon_suffix = "d"
         else:
             icon_suffix = "n"

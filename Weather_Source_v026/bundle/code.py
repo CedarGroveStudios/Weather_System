@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
-cedargrove_weather_source_http.py WORKING VERSION
+cedargrove_weather_source_code.py WORKING VERSION
 
 Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
 remote receivers, specifically in support of remote workshop corrosion
@@ -35,7 +35,7 @@ import adafruit_am2320  # I2C temperature/humidity sensor; indoor
 from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
 from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
 
-from v02_display_graphics import Display
+from source_display_graphics import Display
 
 # TFT Display Parameters
 BRIGHTNESS = 0.50
