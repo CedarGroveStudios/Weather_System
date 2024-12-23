@@ -428,8 +428,8 @@ while True:
             display.dew_pt_mask.fill = None
             display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
             display.ext_gusts.text = table_wind_gusts
-            
-            display.display_icon(table_desc, "True")
+
+            display.display_icon(table_desc, table_daylight)
             display.ext_desc.text = table_desc
 
             table_sunrise = datetime.fromisoformat(forecast_table['sunrise']).timetuple()
