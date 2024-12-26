@@ -200,7 +200,7 @@ class Display:
         # Exterior Description
         self.ext_desc = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
         self.ext_desc.anchor_point = (0.5, 0.5)
-        self.ext_desc.anchored_position = (95, 285)
+        self.ext_desc.anchored_position = (89, 285)
         self.image_group.append(self.ext_desc)
 
         # Exterior Sunrise
