@@ -7,9 +7,7 @@ Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
 remote receivers, specifically in support of remote workshop corrosion
 monitoring.
 
-For the ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing
-
-https://github.com/adafruit/Adafruit_CircuitPython_AdafruitIO/blob/main/examples/adafruit_io_http/adafruit_io_weather.py
+For the Adafruit ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing.
 """
 
 import board
@@ -21,20 +19,18 @@ import time
 import rtc
 import ssl
 import supervisor
-import neopixel
+
+# import neopixel
 from adafruit_datetime import datetime
 import adafruit_connection_manager
 import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
 
-import adafruit_am2320  # I2C temperature/humidity sensor; indoor
+# import adafruit_am2320  # I2C temperature/humidity sensor; indoor
 # import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
-
-# Temperature Converter Helpers
 from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
 from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
-
 from source_display_graphics import Display
 
 # TFT Display Parameters
@@ -56,7 +52,7 @@ XMIT_SENSOR = False
 SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 
 # Cooling fan threshold
-FAN_ON_TRESHOLD_F = 100  # Degrees Farenheit
+FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
 
 # fmt: off
 # A couple of day/month lookup tables
@@ -80,9 +76,7 @@ WHITE = 0xFFFFFF
 GRAY = 0x444455
 LCARS_LT_BLU = 0x07A2FF
 
-# Start-up values
-message = ""
-corrosion_index = 0
+# Initialize Heartbeat Indicator Value
 clock_tick = False
 
 """# Instantiate cooling fan control (D5)
@@ -108,7 +102,7 @@ corrosion_sensor.heater = False  # turn heater OFF"""
 def read_local_sensor():
     """Update the temperature and humidity with current values,
     calculate dew point and corrosion index"""
-    #pixel[0] = 0xFFFF00  # Busy (yellow)
+    # pixel[0] = 0xFFFF00  # Busy (yellow)
     """busy(3)  # Wait to read temperature value
     temp_c = corrosion_sensor.temperature
     if temp_c is not None:
@@ -134,7 +128,7 @@ def read_local_sensor():
     else:
         dew_c, _ = dew_point_calc(temp_c, humid_pct)
         dew_f = round(celsius_to_fahrenheit(dew_c), 1)
-    #pixel[0] = 0x00FF00  # Success (green)
+    # pixel[0] = 0x00FF00  # Success (green)
 
     """Calculate corrosion index value; keep former value if temp or
     dewpoint = None. Turn on sensor heater when index = 2 (ALERT);
@@ -144,13 +138,13 @@ def read_local_sensor():
     else:
         if (temp_c <= dew_c + 2) or humid_pct >= 80:
             corrosion_index = 2  # CORROSION ALERT
-            corrosion_sensor.heater = True  # turn heater ON
+            # corrosion_sensor.heater = True  # turn heater ON
         elif temp_c <= dew_c + 5:
             corrosion_index = 1  # CORROSION WARNING
-            #corrosion_sensor.heater = False  # turn heater OFF
+            # corrosion_sensor.heater = False  # turn heater OFF
         else:
             corrosion_index = 0  # NORMAL
-            #corrosion_sensor.heater = False  # turn heater OFF
+            # corrosion_sensor.heater = False  # turn heater OFF
     return temp_f, humid_pct, dew_f, corrosion_index
 
 
@@ -159,7 +153,7 @@ def read_cpu_temp():
     fan if threshold is exceeded.
     Nominal operating range is -40C to 85C (-40F to 185F)."""
     cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
-    """if cpu_temp_f > FAN_ON_TRESHOLD_F:  # Turn on cooling fan if needed
+    """if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
         fan.value = True
     else:
         fan.value = False"""
@@ -184,17 +178,17 @@ def publish_to_aio(value, feed, xmit=True):
     :param str feed: The name of the AIO feed.
     :param bool xmit: True to enable transmitting to AIO. False for local display only.
     """
-    #pixel[0] = 0xFFFF00  # Busy (yellow)
+    # pixel[0] = 0xFFFF00  # Busy (yellow)
     if value is not None:
         if xmit:
             try:
                 while io.get_remaining_throttle_limit() <= 10:
                     time.sleep(1)  # Wait until throttle limit increases
                 io.send_data(feed, value)
-                #pixel[0] = 0x00FF00  # Success (green)
+                # pixel[0] = 0x00FF00  # Success (green)
                 print(f"SEND '{value}' -> {feed}")
             except Exception as aio_publish_error:
-                #pixel[0] = 0xFF0000  # Error (red)
+                # pixel[0] = 0xFF0000  # Error (red)
                 print(f"FAIL: '{value}' -> {feed}")
                 print(f"  {str(aio_publish_error)}")
                 print("  MCU will soft reset in 30 seconds.")
@@ -202,7 +196,7 @@ def publish_to_aio(value, feed, xmit=True):
                 supervisor.reload()  # soft reset: keeps the terminal session alive
         else:
             print(f"DISP '{value}' {feed}")
-            #pixel[0] = 0x00FF00  # Success (green)
+            # pixel[0] = 0x00FF00  # Success (green)
     else:
         print(f"FAIL: '{value}' for {feed}")
 
@@ -242,7 +236,7 @@ def busy(delay):
 
 
 def update_local_time():
-    #pixel[0] = 0xFFFF00  # Busy (yellow)
+    # pixel[0] = 0xFFFF00  # Busy (yellow)
     display.clock_icon_mask.fill = None
     display.wifi_icon_mask.fill = None
     try:
@@ -264,12 +258,14 @@ def update_local_time():
     month = time.localtime().tm_mon
     day = time.localtime().tm_mday
     year = time.localtime().tm_year
-    display.clock_day_mon_yr.text = f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
+    display.clock_day_mon_yr.text = (
+        f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
+    )
     print(display.clock_day_mon_yr.text)
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
-    #pixel[0] = 0x00FFFF  # Normal (green)
+    # pixel[0] = 0x00FFFF  # Normal (green)
     display.clock_icon_mask.fill = LCARS_LT_BLU
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 
@@ -282,11 +278,11 @@ try:
     wifi.radio.connect(
         os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
     )
-    #pixel[0] = 0x00FF00  # Success (green)
+    # pixel[0] = 0x00FF00  # Success (green)
     print("  CONNECTED to WiFi")
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as wifi_access_error:
-    #pixel[0] = 0xFF0000  # Error (red)
+    # pixel[0] = 0xFF0000  # Error (red)
     print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
@@ -298,7 +294,7 @@ weather_table_old = None
 
 # Create an instance of the Adafruit IO HTTP client
 # https://docs.circuitpython.org/projects/adafruitio/en/stable/api.html
-#pixel[0] = 0xFFFF00  # Busy (yellow)
+# pixel[0] = 0xFFFF00  # Busy (yellow)
 print("Connecting to the AIO HTTP service")
 # Initialize a socket pool and requests session
 try:
@@ -308,12 +304,12 @@ try:
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as aio_client_error:
-    #pixel[0] = 0xFF0000  # Error (red)
+    # pixel[0] = 0xFF0000  # Error (red)
     print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
-#pixel[0] = 0x00FFFF  # Normal (green)
+# pixel[0] = 0x00FFFF  # Normal (green)
 
 ### PRIMARY LOOP ###
 while True:
@@ -330,19 +326,19 @@ while True:
     display.humid_mask.fill = BLACK
     display.dew_pt_mask.fill = BLACK
     sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
-    #sens_heat = corrosion_sensor.heater
+    # sens_heat = corrosion_sensor.heater
     sens_heat = False
 
-    #pcb_temp.text = f"{read_pcb_temperature():.1f}°"
+    # pcb_temp.text = f"{read_pcb_temperature():.1f}°"
     display.temperature.text = f"{sens_temp:.1f}°"
     display.humidity.text = f"{sens_humid:.0f}%"
     display.dew_point.text = f"{sens_dew_pt:.1f}°"
 
     publish_to_aio(
-                int(round(time.monotonic() / 60, 0)),
-                "system-watchdog",
-                xmit=XMIT_SENSOR,
-            )
+        int(round(time.monotonic() / 60, 0)),
+        "system-watchdog",
+        xmit=XMIT_SENSOR,
+    )
 
     # Publish local sensor data
     display.wifi_icon_mask.fill = None
@@ -351,7 +347,9 @@ while True:
     publish_to_aio(sens_dew_pt, "shop.int-dewpoint", xmit=XMIT_SENSOR)
     publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
-    publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
+    publish_to_aio(
+        f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR
+    )
 
     display.temp_mask.fill = None
     display.humid_mask.fill = None
@@ -386,30 +384,28 @@ while True:
     # Receive and update the conditions from AIO+ Weather
     try:
         display.wifi_icon_mask.fill = None
-        #pixel[0] = 0xFFFF00  # AIO+ Weather fetch in progress (yellow)
+        # pixel[0] = 0xFFFF00  # AIO+ Weather fetch in progress (yellow)
         while io.get_remaining_throttle_limit() <= 2:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
         # print(weather_table)  # This is a very large json table
         # print("... weather table received ...")
-        #pixel[0] = 0x00FF00  # Success (green)
+        # pixel[0] = 0x00FF00  # Success (green)
         display.wifi_icon_mask.fill = LCARS_LT_BLU
     except Exception as receive_weather_error:
-        #pixel[0] = 0xFF0000  # Error (red)
+        # pixel[0] = 0xFF0000  # Error (red)
         print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
         print("  MCU will soft reset in 30 seconds.")
         busy(30)
         supervisor.reload()  # soft reset: keeps the terminal session alive
 
     if weather_table:
-        forecast_table = weather_table['forecast_days_1']  # for sunrise/sunset
-        weather_table = weather_table['current']  # extract a subset and reduce size
+        forecast_table = weather_table["forecast_days_1"]  # for sunrise/sunset
+        weather_table = weather_table["current"]  # extract a subset and reduce size
         if weather_table != weather_table_old:
             table_desc = weather_table["conditionCode"]
             display.temp_mask.fill = BLACK
-            table_temp = (
-                f"{celsius_to_fahrenheit(weather_table['temperature']):.1f}"
-            )
+            table_temp = f"{celsius_to_fahrenheit(weather_table['temperature']):.1f}"
             display.humid_mask.fill = BLACK
             table_humid = f"{weather_table['humidity'] * 100:.1f}"
             display.dew_pt_mask.fill = BLACK
@@ -424,7 +420,9 @@ while True:
 
             display.ext_temp.text = f"{table_temp}°"
             display.ext_humid.text = f"{table_humid[:-2]}%"
-            display.ext_dew.text = f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°"
+            display.ext_dew.text = (
+                f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°"
+            )
             display.dew_pt_mask.fill = None
             display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
             display.ext_gusts.text = table_wind_gusts
@@ -432,7 +430,9 @@ while True:
             display.display_icon(table_desc, table_daylight)
             display.ext_desc.text = table_desc
 
-            table_sunrise = datetime.fromisoformat(forecast_table['sunrise']).timetuple()
+            table_sunrise = datetime.fromisoformat(
+                forecast_table["sunrise"]
+            ).timetuple()
             sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
             if sunrise_hr < 0:
                 sunrise_hr = sunrise_hr + 24
@@ -440,9 +440,11 @@ while True:
                 sunrise_hr = sunrise_hr - 12
             if sunrise_hr == 0:
                 sunrise_hr = 12
-            display.ext_sunrise.text = f"rise {sunrise_hr:02d}:{table_sunrise.tm_min:02d}"
+            display.ext_sunrise.text = (
+                f"rise {sunrise_hr:02d}:{table_sunrise.tm_min:02d}"
+            )
 
-            table_sunset = datetime.fromisoformat(forecast_table['sunset']).timetuple()
+            table_sunset = datetime.fromisoformat(forecast_table["sunset"]).timetuple()
             sunset_hr = table_sunset.tm_hour + os.getenv("TIMEZONE_OFFSET")
             if sunset_hr < 0:
                 sunset_hr = sunset_hr + 24
@@ -454,7 +456,7 @@ while True:
 
             # Build a composite feed value
             composite_tuple = f"{str(table_daylight)},{display.ext_sunrise.text[-5:]},{display.ext_sunset.text[-5:]}"
-            #print(composite_tuple)
+            # print(composite_tuple)
 
             # Publish table data
             publish_to_aio(
@@ -485,11 +487,10 @@ while True:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
-        #print(f"NOTE Cooling fan state: {fan.value}")
+        # print(f"NOTE Cooling fan state: {fan.value}")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:
         w_topic_desc = os.getenv("WEATHER_TOPIC_DESC")
         print(f"  ... waiting for conditions from {w_topic_desc}")
         busy(10)  # Step up query rate when first starting
-

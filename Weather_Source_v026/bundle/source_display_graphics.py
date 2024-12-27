@@ -5,7 +5,7 @@ source_display_graphics.py
 
 Builds the display graphics class for the Weather Source device.
 
-For the ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing
+For the Adafruit ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing.
 """
 
 import board
@@ -14,12 +14,10 @@ import gc
 import time
 import pwmio
 from adafruit_display_text.label import Label
-from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_shapes.roundrect import RoundRect
 from adafruit_display_shapes.triangle import Triangle
-
-from weatherkit_to_weathmap_icon import kit_to_map_icon
+from weatherkit_to_icon import kit_to_icon
 
 
 # fmt: off
@@ -49,10 +47,9 @@ GUSTS        = 0xfd614a
 
 
 class Display:
-    """  """
+    """ """
 
     def __init__(self, tft="3.5-inch", rotation=180, brightness=0.50):
-
         self._backlite = pwmio.PWMOut(board.TX, frequency=500)
         self._backlite.duty_cycle = 0
 
@@ -62,6 +59,7 @@ class Display:
         if "2.4" in tft:
             # Instantiate the 2.4" TFT FeatherWing Display
             import adafruit_ili9341  # 2.4" TFT FeatherWing
+
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
                 board.SPI(), command=board.D10, chip_select=board.D9, reset=None
@@ -70,6 +68,7 @@ class Display:
         else:
             # Instantiate the 3.5" TFT FeatherWing Display
             import adafruit_hx8357  # 3.5" TFT FeatherWing
+
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
                 board.SPI(), command=board.D6, chip_select=board.D5, reset=None
@@ -97,34 +96,48 @@ class Display:
         self._display.root_group = self.image_group  # Load display
 
         desc_icon = displayio.OnDiskBitmap("/cedar_grove_blue_120x50.bmp")
-        icon = displayio.TileGrid(desc_icon, pixel_shader=desc_icon.pixel_shader, x=29, y=225)
+        icon = displayio.TileGrid(
+            desc_icon, pixel_shader=desc_icon.pixel_shader, x=29, y=225
+        )
         self.image_group.append(icon)
 
         ### Define display graphic, label, and mask areas
 
         ## Define masks
         # Heartbeat Icon Mask
-        self.clock_tick_mask = RoundRect(458, 297, 10, 11, 1, fill=VIOLET, outline=None, stroke=0)
+        self.clock_tick_mask = RoundRect(
+            458, 297, 10, 11, 1, fill=VIOLET, outline=None, stroke=0
+        )
         self.image_group.append(self.clock_tick_mask)
 
         # Temp/Humid Sensor Icon Mask
-        self.sensor_icon_mask = Rect(370, 20, 20, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        self.sensor_icon_mask = Rect(
+            370, 20, 20, 50, fill=LCARS_LT_BLU, outline=None, stroke=0
+        )
         self.image_group.append(self.sensor_icon_mask)
 
         # Sensor Heater Icon Mask
-        self.heater_icon_mask = Rect(345, 20, 25, 30, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        self.heater_icon_mask = Rect(
+            345, 20, 25, 30, fill=LCARS_LT_BLU, outline=None, stroke=0
+        )
         self.image_group.append(self.heater_icon_mask)
 
         # Clock Icon Mask
-        self.clock_icon_mask = Rect(405, 20, 50, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        self.clock_icon_mask = Rect(
+            405, 20, 50, 50, fill=LCARS_LT_BLU, outline=None, stroke=0
+        )
         self.image_group.append(self.clock_icon_mask)
 
         # SD Icon Mask; Also Masks Battery and Speaker Icons
-        self.sd_icon_mask = Rect(330, 225, 90, 55, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        self.sd_icon_mask = Rect(
+            330, 225, 90, 55, fill=LCARS_LT_BLU, outline=None, stroke=0
+        )
         self.image_group.append(self.sd_icon_mask)
 
         # Network Icon Mask
-        self.wifi_icon_mask = Rect(420, 230, 40, 50, fill=LCARS_LT_BLU, outline=None, stroke=0)
+        self.wifi_icon_mask = Rect(
+            420, 230, 40, 50, fill=LCARS_LT_BLU, outline=None, stroke=0
+        )
         self.image_group.append(self.wifi_icon_mask)
 
         # Data Status Masks
@@ -140,7 +153,9 @@ class Display:
         self.image_group.append(self.gusts_mask)
 
         # Corrosion Status Icon and Text
-        self.status_icon = Triangle(95, 155, 130, 210, 60, 210, fill=LCARS_LT_BLU, outline=None)
+        self.status_icon = Triangle(
+            95, 155, 130, 210, 60, 210, fill=LCARS_LT_BLU, outline=None
+        )
         self.image_group.append(self.status_icon)
 
         self.status = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
@@ -246,7 +261,6 @@ class Display:
         # Set backlight to brightness after initialization
         self._backlite.duty_cycle = int(self._brightness * 0xFFFF)
 
-
     @property
     def display(self):
         return self._display
@@ -277,7 +291,6 @@ class Display:
         self._rotation = rot
         self.display.rotation = rot
 
-
     def display_icon(self, desc="Clear", daylight=True):
         if isinstance(daylight, str):
             if daylight == "True":
@@ -288,14 +301,15 @@ class Display:
             icon_suffix = "d"
         else:
             icon_suffix = "n"
-        icon_file = f"/icons/{kit_to_map_icon[desc][1]}{icon_suffix}_120x50.bmp"
+        icon_file = f"/icons/{kit_to_icon[desc][1]}{icon_suffix}_120x50.bmp"
         print(f"Icon filename: {icon_file}")
 
         self.image_group.pop(1)
         icon_image = displayio.OnDiskBitmap(icon_file)
-        icon_bg = displayio.TileGrid(icon_image, pixel_shader=icon_image.pixel_shader, x=29, y=225)
+        icon_bg = displayio.TileGrid(
+            icon_image, pixel_shader=icon_image.pixel_shader, x=29, y=225
+        )
         self.image_group.insert(1, icon_bg)
-
 
     def alert(self, text=""):
         # Place alert message in clock message area. Default is a blank message.
@@ -316,4 +330,3 @@ class Display:
             time.sleep(0.5)
             self.display_message.color = None
         return
-
