@@ -1,11 +1,9 @@
-# SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
+# SPDX-FileCopyrightText: 2024, 2025 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
 source_display_graphics.py
 
 Builds the display graphics class for the Weather Source device.
-
-For the Adafruit ESP32-S2 FeatherS2 with attached 3.2-inch TFT FeatherWing.
 """
 
 import board
@@ -34,7 +32,7 @@ PINK         = 0XEF5CA4
 ORANGE       = 0xFF8811
 YELLOW       = 0xFFFF00
 GREEN        = 0x00FF00
-LT_GRN       = 0x00BB00
+LT_GRN       = 0x5dd82f
 CYAN         = 0x00FFFF
 BLUE         = 0x0000FF
 LT_BLUE      = 0x000044
@@ -71,7 +69,7 @@ class Display:
 
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
-                board.SPI(), command=board.D6, chip_select=board.D5, reset=None
+                board.SPI(), command=board.D10, chip_select=board.D9, reset=None
             )
             self._display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
         self._display.rotation = self._rotation
