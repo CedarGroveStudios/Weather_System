@@ -7,7 +7,7 @@ Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
 remote receivers, specifically in support of remote workshop corrosion
 monitoring.
 
-For the Adafruit ESP32-S3 Feather with attached 3.5-inch TFT FeatherWing.
+For the UnexpectedMaker FeatherS2 with attached 3.5-inch TFT FeatherWing.
 """
 
 import board
@@ -20,7 +20,6 @@ import rtc
 import ssl
 import supervisor
 
-import neopixel
 from adafruit_datetime import datetime
 import adafruit_connection_manager
 import wifi
@@ -48,6 +47,11 @@ XMIT_SENSOR:  True to read local sensor data and send to AIO feeds
 XMIT_WEATHER = False
 XMIT_SENSOR = False
 SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
+
+
+# Other Peripherals
+NEOPIXEL = False  # False when using the FeatherS2
+FAN = False
 
 # Cooling fan threshold
 FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
@@ -83,9 +87,10 @@ ERROR = RED
 clock_tick = False
 
 # Instantiate cooling fan control (D5)
-fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
-fan.direction = digitalio.Direction.OUTPUT
-fan.value = False  # Initialize with fan off
+if FAN:
+    fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
+    fan.direction = digitalio.Direction.OUTPUT
+    fan.value = False  # Initialize with fan off
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
@@ -93,8 +98,10 @@ led.direction = digitalio.Direction.OUTPUT
 led.value = False
 
 # Initialize the NeoPixel
-pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=BRIGHTNESS)
-pixel[0] = STARTUP  # Initializing (purple)
+if NEOPIXEL:
+    import neopixel
+    pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=BRIGHTNESS)
+    pixel[0] = STARTUP  # Initializing (purple)
 
 """# Instantiate the local corrosion sensor
 # corrosion_sensor = adafruit_sht31d.SHT31D(board.I2C())  # outdoor sensor
@@ -105,7 +112,7 @@ corrosion_sensor.heater = False  # turn heater OFF"""
 def read_local_sensor():
     """Update the temperature and humidity with current values,
     calculate dew point and corrosion index"""
-    pixel[0] = FETCH  # Busy (yellow)
+    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
     """busy(3)  # Wait to read temperature value
     temp_c = corrosion_sensor.temperature
     if temp_c is not None:
@@ -131,7 +138,7 @@ def read_local_sensor():
     else:
         dew_c, _ = dew_point_calc(temp_c, humid_pct)
         dew_f = round(celsius_to_fahrenheit(dew_c), 1)
-    pixel[0] = NORMAL  # Success (green)
+    if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
 
     """Calculate corrosion index value; keep former value if temp or
     dewpoint = None. Turn on sensor heater when index = 2 (ALERT);
@@ -156,10 +163,11 @@ def read_cpu_temp():
     fan if threshold is exceeded.
     Nominal operating range is -40C to 85C (-40F to 185F)."""
     cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
-    if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
-        fan.value = True
-    else:
-        fan.value = False
+    if FAN:
+        if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
+            fan.value = True
+        else:
+            fan.value = False
     return cpu_temp_f
 
 
@@ -181,17 +189,17 @@ def publish_to_aio(value, feed, xmit=True):
     :param str feed: The name of the AIO feed.
     :param bool xmit: True to enable transmitting to AIO. False for local display only.
     """
-    pixel[0] = FETCH  # Busy (yellow)
+    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
     if value is not None:
         if xmit:
             try:
                 while io.get_remaining_throttle_limit() <= 10:
                     time.sleep(1)  # Wait until throttle limit increases
                 io.send_data(feed, value)
-                pixel[0] = NORMAL  # Success (green)
+                if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
                 print(f"SEND '{value}' -> {feed}")
             except Exception as aio_publish_error:
-                pixel[0] = ERROR  # Error (red)
+                if NEOPIXEL: pixel[0] = ERROR  # Error (red)
                 print(f"FAIL: '{value}' -> {feed}")
                 print(f"  {str(aio_publish_error)}")
                 print("  MCU will soft reset in 30 seconds.")
@@ -199,7 +207,7 @@ def publish_to_aio(value, feed, xmit=True):
                 supervisor.reload()  # soft reset: keeps the terminal session alive
         else:
             print(f"DISP '{value}' {feed}")
-            pixel[0] = NORMAL  # Success (green)
+            if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
     else:
         print(f"FAIL: '{value}' for {feed}")
 
@@ -209,17 +217,17 @@ def busy(delay):
     Time display is updated from localtime each second. A blocking method.
     :param float delay: The time delay in seconds. No default."""
     global clock_tick
-    # neo_color = pixel[0]
+    # if NEOPIXEL: neo_color = pixel[0]
     for blinks in range(int(round(delay, 0))):
         start = time.monotonic()
         if clock_tick:
             display.clock_tick_mask.fill = YELLOW
             led.value = True
-            # pixel[0] = GRAY
+            # if NEOPIXEL: pixel[0] = GRAY
         else:
             display.clock_tick_mask.fill = None
             led.value = False
-            # pixel[0] = neo_color
+            # if NEOPIXEL: pixel[0] = neo_color
         clock_tick = not clock_tick
 
         if time.localtime().tm_hour > 12:
@@ -239,7 +247,7 @@ def busy(delay):
 
 
 def update_local_time():
-    pixel[0] = FETCH  # Busy (yellow)
+    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
     display.clock_icon_mask.fill = None
     display.wifi_icon_mask.fill = None
     try:
@@ -268,7 +276,7 @@ def update_local_time():
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
-    pixel[0] = NORMAL  # Normal (green)
+    if NEOPIXEL: pixel[0] = NORMAL  # Normal (green)
     display.clock_icon_mask.fill = LCARS_LT_BLU
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 
@@ -281,11 +289,11 @@ try:
     wifi.radio.connect(
         os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
     )
-    pixel[0] = NORMAL  # Success (green)
+    if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
     print("  CONNECTED to WiFi")
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as wifi_access_error:
-    pixel[0] = ERROR  # Error (red)
+    if NEOPIXEL: pixel[0] = ERROR  # Error (red)
     print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
@@ -297,7 +305,7 @@ weather_table_old = None
 
 # Create an instance of the Adafruit IO HTTP client
 # https://docs.circuitpython.org/projects/adafruitio/en/stable/api.html
-pixel[0] = FETCH  # Busy (yellow)
+if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
 print("Connecting to the AIO HTTP service")
 # Initialize a socket pool and requests session
 try:
@@ -307,12 +315,12 @@ try:
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
     display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as aio_client_error:
-    pixel[0] = ERROR  # Error (red)
+    if NEOPIXEL: pixel[0] = ERROR  # Error (red)
     print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
-pixel[0] = NORMAL  # Normal (green)
+if NEOPIXEL: pixel[0] = NORMAL  # Normal (green)
 
 ### PRIMARY LOOP ###
 while True:
@@ -387,16 +395,16 @@ while True:
     # Receive and update the conditions from AIO+ Weather
     try:
         display.wifi_icon_mask.fill = None
-        pixel[0] = FETCH  # AIO+ Weather fetch in progress (yellow)
+        if NEOPIXEL: pixel[0] = FETCH  # AIO+ Weather fetch in progress (yellow)
         while io.get_remaining_throttle_limit() <= 2:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
         # print(weather_table)  # This is a very large json table
         # print("... weather table received ...")
-        pixel[0] = NORMAL  # Success (green)
+        if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
         display.wifi_icon_mask.fill = LCARS_LT_BLU
     except Exception as receive_weather_error:
-        pixel[0] = ERROR  # Error (red)
+        if NEOPIXEL: pixel[0] = ERROR  # Error (red)
         print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
         print("  MCU will soft reset in 30 seconds.")
         busy(30)
@@ -490,7 +498,8 @@ while True:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
-        print(f"NOTE Cooling fan state: {fan.value}")
+        if FAN:
+            print(f"NOTE Cooling fan state: {fan.value}")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:

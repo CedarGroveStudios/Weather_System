@@ -4,6 +4,7 @@
 source_display_graphics.py
 
 Builds the display graphics class for the Weather Source device.
+For the UnexpectedMaker FeatherS2 with attached 3.5-inch TFT FeatherWing.
 """
 
 import board
@@ -60,7 +61,7 @@ class Display:
 
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
-                board.SPI(), command=board.D10, chip_select=board.D9, reset=None
+                board.SPI(), command=board.D6, chip_select=board.D5, reset=None
             )
             self._display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
         else:
@@ -69,7 +70,7 @@ class Display:
 
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
-                board.SPI(), command=board.D10, chip_select=board.D9, reset=None
+                board.SPI(), command=board.D6, chip_select=board.D5, reset=None
             )
             self._display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
         self._display.rotation = self._rotation
