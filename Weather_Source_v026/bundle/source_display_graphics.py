@@ -4,7 +4,7 @@
 source_display_graphics.py
 
 Builds the display graphics class for the Weather Source device.
-For the UnexpectedMaker FeatherS2 with attached 3.5-inch TFT FeatherWing.
+For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
 """
 
 import board
@@ -61,7 +61,7 @@ class Display:
 
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
-                board.SPI(), command=board.D6, chip_select=board.D5, reset=None
+                board.SPI(), command=board.D10, chip_select=board.D9, reset=None
             )
             self._display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
         else:
@@ -70,7 +70,7 @@ class Display:
 
             displayio.release_displays()  # Release display resources
             display_bus = displayio.FourWire(
-                board.SPI(), command=board.D6, chip_select=board.D5, reset=None
+                board.SPI(), command=board.D10, chip_select=board.D9, reset=None
             )
             self._display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
         self._display.rotation = self._rotation
@@ -78,7 +78,6 @@ class Display:
         self.width = self._display.width
         self.height = self._display.height
 
-        from font_orbitron_bold_webfont_14 import FONT as ORBITRON_BOLD_14
         from font_orbitron_bold_webfont_18 import FONT as ORBITRON_BOLD_18
         from font_orbitron_bold_webfont_24 import FONT as ORBITRON_BOLD_24
         from font_orbitron_bold_webfont_48 import FONT as ORBITRON_BOLD_48
@@ -242,16 +241,22 @@ class Display:
         self.image_group.append(self.clock_day_mon_yr)
 
         # Project Message Area
-        self.display_message = Label(ORBITRON_BOLD_14, text=" ", color=YELLOW)
+        self.display_message = Label(ORBITRON_BOLD_18, text=" ", color=YELLOW)
         self.display_message.anchor_point = (0.5, 0.5)
         self.display_message.anchored_position = (390, 100)
         self.image_group.append(self.display_message)
 
         # PCB Temperature
         self.pcb_temp = Label(ORBITRON_LIGHT_12, text="°", color=CYAN)
-        self.pcb_temp.anchor_point = (0.5, 0.5)
-        self.pcb_temp.anchored_position = (390, 302)
+        self.pcb_temp.anchor_point = (1.0, 0.5)
+        self.pcb_temp.anchored_position = (445, 302)
         self.image_group.append(self.pcb_temp)
+        
+        # Mode Description
+        self.mode = Label(ORBITRON_LIGHT_12, text=" ", color=BLACK)
+        self.mode.anchor_point = (0.5, 0.5)
+        self.mode.anchored_position = (245, 302)
+        self.image_group.append(self.mode)
 
         gc.collect()
 
@@ -300,7 +305,7 @@ class Display:
             icon_suffix = "d"
         else:
             icon_suffix = "n"
-        icon_file = f"/icons/{kit_to_icon[desc][1]}{icon_suffix}_120x50.bmp"
+        icon_file = f"/icons/{kit_to_icon[desc][1]}{icon_suffix}_v27_120x50.bmp"
         print(f"Icon filename: {icon_file}")
 
         self.image_group.pop(1)
@@ -317,7 +322,7 @@ class Display:
             msg_text = ""
             self.display_message.text = msg_text
         else:
-            print("ALERT: " + msg_text)
+            # print("ALERT: " + msg_text)
             self.display_message.color = RED
             self.display_message.text = msg_text
             time.sleep(0.1)

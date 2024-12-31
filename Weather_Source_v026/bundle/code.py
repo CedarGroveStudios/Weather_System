@@ -7,7 +7,7 @@ Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
 remote receivers, specifically in support of remote workshop corrosion
 monitoring.
 
-For the UnexpectedMaker FeatherS2 with attached 3.5-inch TFT FeatherWing.
+For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
 """
 
 import board
@@ -19,6 +19,7 @@ import time
 import rtc
 import ssl
 import supervisor
+import neopixel
 
 from adafruit_datetime import datetime
 import adafruit_connection_manager
@@ -26,9 +27,7 @@ import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
 
-# import adafruit_am2320  # I2C temperature/humidity sensor; indoor
-# import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
-from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
+from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit, fahrenheit_to_celsius
 from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
 from source_display_graphics import Display
 
@@ -37,24 +36,6 @@ BRIGHTNESS = 0.50
 ROTATION = 180
 
 display = Display(rotation=ROTATION, brightness=BRIGHTNESS)
-
-"""Operating Mode Parameters
-XMIT_WEATHER: True to read AIO+ Weather conditions and send to AIO feeds
-              False to get conditions and display locally
-XMIT_SENSOR:  True to read local sensor data and send to AIO feeds
-              False to read sensor data and display locally
-"""
-XMIT_WEATHER = False
-XMIT_SENSOR = False
-SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
-
-
-# Other Peripherals
-NEOPIXEL = False  # False when using the FeatherS2
-FAN = False
-
-# Cooling fan threshold
-FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
 
 # fmt: off
 # A couple of day/month lookup tables
@@ -77,20 +58,35 @@ WHITE   = 0xFFFFFF
 GRAY    = 0x444455
 LCARS_LT_BLU = 0x07A2FF
 
+# Define a few states and mode values
 STARTUP = VIOLET
-NORMAL = LCARS_LT_BLU
-FETCH = YELLOW
-ERROR = RED
+NORMAL  = LCARS_LT_BLU
+FETCH   = YELLOW
+ERROR   = RED
+
+SOURCE_MODE  = "SOURCE"
+DISPLAY_MODE = "DISPLAY"
 # fmt: on
 
-# Initialize Heartbeat Indicator Value
-clock_tick = False
+# Operating Mode
+MODE = DISPLAY_MODE  # Selects either Source or Display mode
+display.mode.text = MODE
+
+# Source Mode Parameters
+XMIT_WEATHER = False  # Send AIO+ Weather conditions to AIO feeds when in Source mode
+XMIT_SENSOR = False  # Send local sensor conditions to AIO feeds when in Source mode
+SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
+SENSOR_INTERVAL = 30  # Interval (sec) for local check of sensor during busy function
+
+# Display Mode Parameters
+
+# Internal cooling fan threshold
+FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
 
 # Instantiate cooling fan control (D5)
-if FAN:
-    fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
-    fan.direction = digitalio.Direction.OUTPUT
-    fan.value = False  # Initialize with fan off
+fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
+fan.direction = digitalio.Direction.OUTPUT
+fan.value = False  # Initialize with fan off
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
@@ -98,63 +94,119 @@ led.direction = digitalio.Direction.OUTPUT
 led.value = False
 
 # Initialize the NeoPixel
-if NEOPIXEL:
-    import neopixel
-    pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=BRIGHTNESS)
-    pixel[0] = STARTUP  # Initializing (purple)
+pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=BRIGHTNESS)
+pixel[0] = STARTUP  # Initializing
 
-"""# Instantiate the local corrosion sensor
-# corrosion_sensor = adafruit_sht31d.SHT31D(board.I2C())  # outdoor sensor
-corrosion_sensor = adafruit_am2320.AM2320(board.I2C())  # indoor sensor
-corrosion_sensor.heater = False  # turn heater OFF"""
+# Initialize Heartbeat Indicator Value
+clock_tick = False
+
+if MODE == SOURCE_MODE:
+    """# Instantiate the local corrosion sensor
+    SENSOR_DELAY = 3
+    SENSOR_HEAT = True
+    SENSOR_TEMP_OFFSET = 0
+    # import adafruit_sht31d
+    # corrosion_sensor = adafruit_sht31d.SHT31D(board.I2C())  # outdoor sensor
+    import adafruit_am2320
+    corrosion_sensor = adafruit_am2320.AM2320(board.I2C())  # indoor sensor
+    corrosion_sensor.heater = False  # turn heater OFF"""
+
+    # Stemma-attached local sensor BME680
+    SENSOR_DELAY = 0
+    SENSOR_HEAT = False
+    SENSOR_TEMP_OFFSET = -1
+    import adafruit_bme680
+    corrosion_sensor = adafruit_bme680.Adafruit_BME680_I2C(board.STEMMA_I2C())  # indoor sensor board
 
 
 def read_local_sensor():
-    """Update the temperature and humidity with current values,
-    calculate dew point and corrosion index"""
-    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
-    """busy(3)  # Wait to read temperature value
-    temp_c = corrosion_sensor.temperature
-    if temp_c is not None:
-        temp_c = min(max(temp_c, -40), 125)  # constrain value
-        temp_c = round(temp_c, 1)  # Celsius
-        temp_f = round(celsius_to_fahrenheit(temp_c), 1)  # Fahrenheit
+    """Read the local sensor's temperature and humidity, calculate
+    dew point and corrosion index, and display results."""
+    pixel[0] = FETCH  # Busy
+    display.sensor_icon_mask.fill = None
+    
+    # Display local sensor temperature
+    display.temp_mask.fill = BLACK
+    display.dew_pt_mask.fill = BLACK
+    if MODE == SOURCE_MODE:
+        # Read the local sensor
+        time.sleep(SENSOR_DELAY)  # Wait to read temperature value
+        temp_c = corrosion_sensor.temperature + SENSOR_TEMP_OFFSET
+        if temp_c is not None:
+            temp_c = min(max(temp_c, -40), 85)  # constrain value
+            temp_c = round(temp_c, 1)  # Celsius
+            temp_f = round(celsius_to_fahrenheit(temp_c), 1)  # Fahrenheit
+        else:
+            temp_f = None
     else:
-        temp_f = None
-    busy(3)  # Wait to read humidity value
-    humid_pct = corrosion_sensor.relative_humidity
-    if humid_pct is not None:
-        humid_pct = min(max(humid_pct, 0), 100)  # constrain value
-        humid_pct = round(humid_pct, 1)"""
+        # Get the sensor temperature from AIO feed
+        temp_f = float(get_last_value("shop.int-temperature"))
+        temp_c = round(fahrenheit_to_celsius(temp_f), 1)  # Celsius
+    display.temperature.text = f"{temp_f:.1f}°"
+    display.temp_mask.fill = None
+    
+    # Display local sensor humidity
+    display.humid_mask.fill = BLACK
+    if MODE == SOURCE_MODE:
+        time.sleep(SENSOR_DELAY)  # Wait to read humidity value
+        humid_pct = corrosion_sensor.relative_humidity
+        if humid_pct is not None:
+            humid_pct = min(max(humid_pct, 0), 100)  # constrain value
+            humid_pct = round(humid_pct, 1)
+    else:
+        # Get the sensor humidity from AIO feed
+        humid_pct = float(get_last_value("shop.int-humidity"))
+    display.humidity.text = f"{humid_pct:.0f}%"
+    display.humid_mask.fill = None
 
-    temp_c = 17.1
-    temp_f = 62.8
-    humid_pct = 42
-
-    # Calculate dew point values
+    # Display dew point
     if None in (temp_c, humid_pct):
         dew_c = None
         dew_f = None
     else:
         dew_c, _ = dew_point_calc(temp_c, humid_pct)
         dew_f = round(celsius_to_fahrenheit(dew_c), 1)
-    if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
+    display.dew_point.text = f"{dew_f:.1f}°"
+    display.dew_pt_mask.fill = None
+    
+    display.sensor_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Success
+    
+    # Calculate and display corrosion index value.
+    #   Turn on sensor heater when index = 2 (ALERT);
+    #   heater turns off for other corrosion index conditions.
+    if (temp_c <= dew_c + 2) or humid_pct >= 80:
+        corrosion_index = 2  # CORROSION ALERT
+        display.status_icon.fill = RED
+        display.status.color = BLACK
+        display.status.text = "ALERT"
+        display.alert("CORROSION ALERT")
+        if MODE == SOURCE_MODE and SENSOR_HEAT:
+            corrosion_sensor.heater = True  # turn heater ON
+            display.heater_icon_mask.fill = None
+            
+    elif temp_c <= dew_c + 5:
+        corrosion_index = 1  # CORROSION WARNING
+        display.status_icon.fill = YELLOW
+        display.status.color = RED
+        display.status.text = "WARN"
+        display.alert("CORROSION WARNING")
+        if MODE == SOURCE_MODE and SENSOR_HEAT:
+            corrosion_sensor.heater = False  # turn heater OFF
+        display.heater_icon_mask.fill = LCARS_LT_BLU
 
-    """Calculate corrosion index value; keep former value if temp or
-    dewpoint = None. Turn on sensor heater when index = 2 (ALERT);
-    heater turns off for other corrosion index conditions."""
-    if None in (temp_c, dew_c):
-        return
     else:
-        if (temp_c <= dew_c + 2) or humid_pct >= 80:
-            corrosion_index = 2  # CORROSION ALERT
-            # corrosion_sensor.heater = True  # turn heater ON
-        elif temp_c <= dew_c + 5:
-            corrosion_index = 1  # CORROSION WARNING
-            # corrosion_sensor.heater = False  # turn heater OFF
-        else:
-            corrosion_index = 0  # NORMAL
-            # corrosion_sensor.heater = False  # turn heater OFF
+        corrosion_index = 0  # NORMAL
+        display.status_icon.fill = LT_GRN
+        display.status.color = BLACK
+        display.status.text = "OK"
+        display.alert("NORMAL")
+        if MODE == SOURCE_MODE and SENSOR_HEAT:
+            corrosion_sensor.heater = False  # turn heater OFF
+        display.heater_icon_mask.fill = LCARS_LT_BLU
+            
+    display.sensor_icon_mask.fill = LCARS_LT_BLU
+
     return temp_f, humid_pct, dew_f, corrosion_index
 
 
@@ -163,11 +215,10 @@ def read_cpu_temp():
     fan if threshold is exceeded.
     Nominal operating range is -40C to 85C (-40F to 185F)."""
     cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
-    if FAN:
-        if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
-            fan.value = True
-        else:
-            fan.value = False
+    if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
+        fan.value = True
+    else:
+        fan.value = False
     return cpu_temp_f
 
 
@@ -182,6 +233,29 @@ def wind_direction(heading):
     ]
 
 
+def get_last_value(feed_key):
+    """Fetch the latest value of the AIO feed.
+    :param str feed_key: The AIO feed key."""
+    pixel[0] = FETCH
+    display.wifi_icon_mask.fill = None
+    try:
+        # print(f"throttle limit: {pyportal.network.io_client.get_remaining_throttle_limit()}")
+        while io.get_remaining_throttle_limit() <= 10:
+            time.sleep(1)  # Wait until throttle limit increases
+        last_value = io.receive_data(feed_key)["value"]
+    except Exception as aio_feed_error:
+        pixel[0] = ERROR
+        display.image_group = None
+        print(f"FAIL: <- {feed}")
+        print(f"  {str(aio_feed_error)}")
+        print("  MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Success
+    return last_value
+
+
 def publish_to_aio(value, feed, xmit=True):
     """Publish a value to an AIO feed, while monitoring checking the throttle
     transaction rate. A blocking method.
@@ -189,17 +263,18 @@ def publish_to_aio(value, feed, xmit=True):
     :param str feed: The name of the AIO feed.
     :param bool xmit: True to enable transmitting to AIO. False for local display only.
     """
-    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
+    pixel[0] = FETCH  # Busy (yellow)
+    display.wifi_icon_mask.fill = None
     if value is not None:
         if xmit:
             try:
                 while io.get_remaining_throttle_limit() <= 10:
                     time.sleep(1)  # Wait until throttle limit increases
                 io.send_data(feed, value)
-                if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
                 print(f"SEND '{value}' -> {feed}")
             except Exception as aio_publish_error:
-                if NEOPIXEL: pixel[0] = ERROR  # Error (red)
+                pixel[0] = ERROR  # Error
+                display.image_group = None
                 print(f"FAIL: '{value}' -> {feed}")
                 print(f"  {str(aio_publish_error)}")
                 print("  MCU will soft reset in 30 seconds.")
@@ -207,9 +282,11 @@ def publish_to_aio(value, feed, xmit=True):
                 supervisor.reload()  # soft reset: keeps the terminal session alive
         else:
             print(f"DISP '{value}' {feed}")
-            if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
     else:
         print(f"FAIL: '{value}' for {feed}")
+
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Success
 
 
 def busy(delay):
@@ -217,17 +294,16 @@ def busy(delay):
     Time display is updated from localtime each second. A blocking method.
     :param float delay: The time delay in seconds. No default."""
     global clock_tick
-    # if NEOPIXEL: neo_color = pixel[0]
     for blinks in range(int(round(delay, 0))):
+        if blinks % SENSOR_INTERVAL == 0 and MODE == SOURCE_MODE:
+            read_local_sensor()
         start = time.monotonic()
         if clock_tick:
             display.clock_tick_mask.fill = YELLOW
             led.value = True
-            # if NEOPIXEL: pixel[0] = GRAY
         else:
             display.clock_tick_mask.fill = None
             led.value = False
-            # if NEOPIXEL: pixel[0] = neo_color
         clock_tick = not clock_tick
 
         if time.localtime().tm_hour > 12:
@@ -240,14 +316,14 @@ def busy(delay):
         local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
         display.clock_digits.text = local_time
 
-        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.1f}°"
+        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.1f}°  {SAMPLE_INTERVAL - blinks}"
 
         delay = max((1 - (time.monotonic() - start)), 0)
         time.sleep(delay)
 
 
 def update_local_time():
-    if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
+    pixel[0] = FETCH  # Busy
     display.clock_icon_mask.fill = None
     display.wifi_icon_mask.fill = None
     try:
@@ -276,28 +352,30 @@ def update_local_time():
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
-    if NEOPIXEL: pixel[0] = NORMAL  # Normal (green)
     display.clock_icon_mask.fill = LCARS_LT_BLU
     display.wifi_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Normal
 
 
 # Connect to Wi-Fi
+pixel[0] = FETCH  # Busy
+display.wifi_icon_mask.fill = None
 try:
-    display.wifi_icon_mask.fill = None
     # Connect to Wi-Fi access point
     print(f"Connect to {os.getenv('CIRCUITPY_WIFI_SSID')}")
     wifi.radio.connect(
         os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD")
     )
-    if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
     print("  CONNECTED to WiFi")
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as wifi_access_error:
-    if NEOPIXEL: pixel[0] = ERROR  # Error (red)
+    pixel[0] = ERROR  # Error
+    display.image_group = None
     print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
+display.wifi_icon_mask.fill = LCARS_LT_BLU
+pixel[0] = NORMAL  # Success
 
 # Initialize the weather_table and history variables
 weather_table = None
@@ -305,22 +383,24 @@ weather_table_old = None
 
 # Create an instance of the Adafruit IO HTTP client
 # https://docs.circuitpython.org/projects/adafruitio/en/stable/api.html
-if NEOPIXEL: pixel[0] = FETCH  # Busy (yellow)
-print("Connecting to the AIO HTTP service")
+
 # Initialize a socket pool and requests session
+pixel[0] = FETCH  # Busy
+display.wifi_icon_mask.fill = None
+print("Connecting to the AIO HTTP service")
 try:
-    display.wifi_icon_mask.fill = None
     pool = adafruit_connection_manager.get_radio_socketpool(wifi.radio)
     requests = adafruit_requests.Session(pool, ssl.create_default_context())
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
 except Exception as aio_client_error:
-    if NEOPIXEL: pixel[0] = ERROR  # Error (red)
+    pixel[0] = ERROR  # Error
+    display.image_group = None
     print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
-if NEOPIXEL: pixel[0] = NORMAL  # Normal (green)
+display.wifi_icon_mask.fill = LCARS_LT_BLU
+pixel[0] = NORMAL  # Normal
 
 ### PRIMARY LOOP ###
 while True:
@@ -331,19 +411,8 @@ while True:
     )
     print("-" * 35)
 
-    display.sensor_icon_mask.fill = None
     # Read the local temperature and humidity sensor
-    display.temp_mask.fill = BLACK
-    display.humid_mask.fill = BLACK
-    display.dew_pt_mask.fill = BLACK
     sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
-    # sens_heat = corrosion_sensor.heater
-    sens_heat = False
-
-    # pcb_temp.text = f"{read_pcb_temperature():.1f}°"
-    display.temperature.text = f"{sens_temp:.1f}°"
-    display.humidity.text = f"{sens_humid:.0f}%"
-    display.dew_point.text = f"{sens_dew_pt:.1f}°"
 
     publish_to_aio(
         int(round(time.monotonic() / 60, 0)),
@@ -353,97 +422,75 @@ while True:
 
     # Publish local sensor data
     display.wifi_icon_mask.fill = None
-    publish_to_aio(sens_temp, "shop.int-temperature", xmit=XMIT_SENSOR)
-    publish_to_aio(sens_humid, "shop.int-humidity", xmit=XMIT_SENSOR)
-    publish_to_aio(sens_dew_pt, "shop.int-dewpoint", xmit=XMIT_SENSOR)
-    publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
-    publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
+    # fmt: off
+    publish_to_aio(sens_temp,      "shop.int-temperature", xmit=XMIT_SENSOR)
+    publish_to_aio(sens_humid,     "shop.int-humidity",    xmit=XMIT_SENSOR)
+    publish_to_aio(sens_dew_pt,    "shop.int-dewpoint",    xmit=XMIT_SENSOR)
+    publish_to_aio(sens_index,     "shop.int-corrosion-index",  xmit=XMIT_SENSOR)
     publish_to_aio(
-        f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR
+        f"{read_cpu_temp():.2f}",  "shop.int-pcb-temperature",  xmit=XMIT_SENSOR
     )
-
-    display.temp_mask.fill = None
-    display.humid_mask.fill = None
-    display.dew_pt_mask.fill = None
-
-    # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
-    if sens_index == 0:
-        display.status_icon.fill = LT_GRN
-        display.status.color = BLACK
-        display.status.text = "OK"
-        display.alert("NORMAL")
-        display.heater_icon_mask.fill = LCARS_LT_BLU
-        display.sensor_icon_mask.fill = LCARS_LT_BLU
-    elif sens_index == 1:
-        display.status_icon.fill = YELLOW
-        display.status.color = RED
-        display.status.text = "WARN"
-        display.alert("CORROSION WARNING")
-        display.heater_icon_mask.fill = LCARS_LT_BLU
-        display.sensor_icon_mask.fill = LCARS_LT_BLU
-    elif sens_index == 2:
-        display.status_icon.fill = RED
-        display.status.color = BLACK
-        display.status.text = "ALERT"
-        display.alert("CORROSION ALERT")
-        display.heater_icon_mask.fill = None
-        display.sensor_icon_mask.fill = None
-
+    # fmt: on
     display.wifi_icon_mask.fill = LCARS_LT_BLU
+    
     print("-" * 35)
 
     # Receive and update the conditions from AIO+ Weather
+    pixel[0] = FETCH  # AIO+ Weather fetch in progress (yellow)
+    display.wifi_icon_mask.fill = None
     try:
-        display.wifi_icon_mask.fill = None
-        if NEOPIXEL: pixel[0] = FETCH  # AIO+ Weather fetch in progress (yellow)
         while io.get_remaining_throttle_limit() <= 2:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
-        # print(weather_table)  # This is a very large json table
-        # print("... weather table received ...")
-        if NEOPIXEL: pixel[0] = NORMAL  # Success (green)
-        display.wifi_icon_mask.fill = LCARS_LT_BLU
     except Exception as receive_weather_error:
         if NEOPIXEL: pixel[0] = ERROR  # Error (red)
+        display.image_group = None
         print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
         print("  MCU will soft reset in 30 seconds.")
         busy(30)
         supervisor.reload()  # soft reset: keeps the terminal session alive
+    
+    # print(weather_table)  # This is a very large json table
+    # print("... weather table received ...")
+    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Success
 
     if weather_table:
         forecast_table = weather_table["forecast_days_1"]  # for sunrise/sunset
         weather_table = weather_table["current"]  # extract a subset and reduce size
         if weather_table != weather_table_old:
             table_desc = weather_table["conditionCode"]
+            
             display.temp_mask.fill = BLACK
             table_temp = f"{celsius_to_fahrenheit(weather_table['temperature']):.1f}"
+            display.ext_temp.text = f"{table_temp}°"
+            
             display.humid_mask.fill = BLACK
             table_humid = f"{weather_table['humidity'] * 100:.1f}"
+            display.ext_humid.text = f"{table_humid[:-2]}%"
+            
             display.dew_pt_mask.fill = BLACK
             table_dew_point = f"{weather_table['temperatureDewPoint']:.1f}"
+            display.ext_dew.text = (
+            f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°")
+            display.dew_pt_mask.fill = None
+            
             display.wind_mask.fill = BLACK
             table_wind_speed = f"{weather_table['windSpeed'] * 0.6214:.0f}"
             table_wind_dir = wind_direction(weather_table["windDirection"])
+            display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
+            
             display.gusts_mask.fill = BLACK
             table_wind_gusts = f"{weather_table['windGust'] * 0.6214:.0f}"
+            display.ext_gusts.text = table_wind_gusts
+            
             table_timestamp = weather_table["metadata"]["readTime"]
             table_daylight = weather_table["daylight"]
-
-            display.ext_temp.text = f"{table_temp}°"
-            display.ext_humid.text = f"{table_humid[:-2]}%"
-            display.ext_dew.text = (
-                f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°"
-            )
-            display.dew_pt_mask.fill = None
-            display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
-            display.ext_gusts.text = table_wind_gusts
 
             display.display_icon(table_desc, table_daylight)
             display.ext_desc.text = table_desc
 
-            table_sunrise = datetime.fromisoformat(
-                forecast_table["sunrise"]
-            ).timetuple()
+            table_sunrise = datetime.fromisoformat(forecast_table["sunrise"]).timetuple()
             sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
             if sunrise_hr < 0:
                 sunrise_hr = sunrise_hr + 24
@@ -475,17 +522,19 @@ while True:
                 "system-watchdog",
                 xmit=XMIT_WEATHER,
             )
-            publish_to_aio(table_desc, "weather-description", xmit=XMIT_WEATHER)
-            publish_to_aio(table_humid, "weather-humidity", xmit=XMIT_WEATHER)
+            # fmt: off
+            publish_to_aio(table_desc,       "weather-description", xmit=XMIT_WEATHER)
+            publish_to_aio(table_humid,      "weather-humidity",    xmit=XMIT_WEATHER)
             display.humid_mask.fill = None
-            publish_to_aio(table_temp, "weather-temperature", xmit=XMIT_WEATHER)
+            publish_to_aio(table_temp,       "weather-temperature", xmit=XMIT_WEATHER)
             display.temp_mask.fill = None
-            publish_to_aio(table_wind_dir, "weather-winddirection", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_speed, "weather-windspeed", xmit=XMIT_WEATHER)
+            publish_to_aio(table_wind_dir,   "weather-winddirection", xmit=XMIT_WEATHER)
+            publish_to_aio(table_wind_speed, "weather-windspeed",    xmit=XMIT_WEATHER)
             display.wind_mask.fill = None
-            publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
+            publish_to_aio(table_wind_gusts, "weather-windgusts",    xmit=XMIT_WEATHER)
             display.gusts_mask.fill = None
-            publish_to_aio(str(table_daylight), "weather-daylight", xmit=XMIT_WEATHER)
+            publish_to_aio(str(table_daylight), "weather-daylight",  xmit=XMIT_WEATHER)
+            # fmt: on
 
             """# Test of composite feed value
             publish_to_aio(composite_tuple, "weather-daylight", xmit=True)
@@ -498,8 +547,7 @@ while True:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
-        if FAN:
-            print(f"NOTE Cooling fan state: {fan.value}")
+        print(f"NOTE Cooling fan state: {fan.value}")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:
