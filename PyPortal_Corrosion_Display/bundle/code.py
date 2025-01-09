@@ -16,7 +16,6 @@ import displayio
 import digitalio
 import analogio
 import supervisor
-from random import randint
 from simpleio import map_range
 import adafruit_pyportal
 from adafruit_display_text.label import Label
@@ -32,6 +31,7 @@ board.DISPLAY.brightness = 0
 
 # AIO Weather Receiver Parameters
 SAMPLE_INTERVAL = 120  # Check corrosion conditions (seconds)
+QUALITY_THRESHOLD = 8  # Quality warning when less than threshold (out of 10)
 BRIGHTNESS = 0.75
 
 # fmt: off
@@ -199,8 +199,9 @@ def get_last_value(feed_key):
             time.sleep(1)  # Wait until throttle limit increases
         time.sleep(1)  # Wait after throttle check query to retrieve feed
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
+        wifi_icon_mask.fill = LCARS_LT_BLU
         return last_value
-    except Exception as e:
+    except (KeyError, IndexError, TimeoutError, BrokenPipeError, RuntimeError) as e:
         # 372, 376 in adafruit_esp32spi._wait_spi_char
         print(f"Error fetching data from feed {feed_key}: {e}")
         print("  MCU will soft reset in 30 seconds.")
@@ -316,12 +317,18 @@ def adjust_brightness():
 
 
 def read_pcb_temperature():
-        """Read the current PCB temperature value in degrees F"""
-        return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
-        return
+    """Read the current PCB temperature value in degrees F"""
+    return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
+    return
 
 
 last_weather_update = time.monotonic()
+
+# Set Initial Quality Value
+quality = 10
+watchdog = get_last_value("system-watchdog")
+previous_watchdog = watchdog
+
 update_display()  # Fetch initial data from AIO
 
 ### Main Loop ###
@@ -330,8 +337,28 @@ while True:
 
     # Update weather every SAMPLE_INTERVAL seconds
     if current_time - last_weather_update > SAMPLE_INTERVAL:
-        update_display()
+
+        # Test for feed quality
+        watchdog = get_last_value("system-watchdog")
+        if watchdog == previous_watchdog:
+            quality -= 1
+            if quality < 0: quality = 0
+            if quality < QUALITY_THRESHOLD:
+                temperature.color = RED
+                humidity.color = RED
+                dew_point.color = RED
+                alert(f"QUAL WARNING : {quality}/10")
+        else:
+            previous_watchdog = watchdog
+            quality = 10
+            temperature.color = WHITE
+            humidity.color = WHITE
+            dew_point.color = WHITE
+            alert(f"QUAL NORMAL : {quality}/10")
+
         last_weather_update = current_time
+
+        update_display()
 
     # Update time every second
     toggle_clock_tick()

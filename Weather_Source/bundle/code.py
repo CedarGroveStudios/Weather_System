@@ -106,7 +106,14 @@ def read_local_sensor():
     calculate dew point and corrosion index"""
     pixel[0] = 0xFFFF00  # Busy (yellow)
     busy(3)  # Wait to read temperature value
-    temp_c = corrosion_sensor.temperature
+    try:
+        temp_c = corrosion_sensor.temperature
+    except Exception as read_sensor_error:
+        print("FAIL: Read Sensor Error")
+        print(f"  {str(read_sensor_error)}")
+        print("  MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
     if temp_c is not None:
         temp_c = min(max(temp_c, -40), 125)  # constrain value
         temp_c = round(temp_c, 1)  # Celsius
@@ -114,7 +121,14 @@ def read_local_sensor():
     else:
         temp_f = None
     busy(3)  # Wait to read humidity value
-    humid_pct = corrosion_sensor.relative_humidity
+    try:
+        humid_pct = corrosion_sensor.relative_humidity
+    except Exception as read_sensor_error:
+        print("FAIL: Read Sensor Error")
+        print(f"  {str(read_sensor_error)}")
+        print("  MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
     if humid_pct is not None:
         humid_pct = min(max(humid_pct, 0), 100)  # constrain value
         humid_pct = round(humid_pct, 1)

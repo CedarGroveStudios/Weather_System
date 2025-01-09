@@ -1,11 +1,10 @@
 # SPDX-FileCopyrightText: 2024, 2025 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
-cedargrove_weather_source_code.py
+cedargrove_weather_display_code.py
 
-Transmits local and AIO+ weather conditions to AIO feeds for dashboards and
-remote receivers, specifically in support of remote workshop corrosion
-monitoring.
+Displays AIO+ weather conditions to AIO feeds in support of remote workshop
+corrosion monitoring.
 
 For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
 """
@@ -63,28 +62,20 @@ STARTUP = VIOLET
 NORMAL  = LCARS_LT_BLU
 FETCH   = YELLOW
 ERROR   = RED
-
-SOURCE_MODE  = "SOURCE"
-DISPLAY_MODE = "DISPLAY"
+THROTTLE_DELAY = GREEN
 # fmt: on
 
 # Operating Mode
-MODE = DISPLAY_MODE  # Selects either Source or Display mode
-display.mode.text = MODE
-
-# Source Mode Parameters
-XMIT_WEATHER = False  # Send AIO+ Weather conditions to AIO feeds when in Source mode
-XMIT_SENSOR = False  # Send local sensor conditions to AIO feeds when in Source mode
-SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
-SENSOR_INTERVAL = 30  # Interval (sec) for local check of sensor during busy function
+display.mode.text = "DISPLAY"
 
 # Display Mode Parameters
+SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 
 # Internal cooling fan threshold
 FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
 
 # Instantiate cooling fan control (D5)
-fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
+fan = digitalio.DigitalInOut(board.D5)
 fan.direction = digitalio.Direction.OUTPUT
 fan.value = False  # Initialize with fan off
 
@@ -99,115 +90,6 @@ pixel[0] = STARTUP  # Initializing
 
 # Initialize Heartbeat Indicator Value
 clock_tick = False
-
-if MODE == SOURCE_MODE:
-    """# Instantiate the local corrosion sensor
-    SENSOR_DELAY = 3
-    SENSOR_HEAT = True
-    SENSOR_TEMP_OFFSET = 0
-    # import adafruit_sht31d
-    # corrosion_sensor = adafruit_sht31d.SHT31D(board.I2C())  # outdoor sensor
-    import adafruit_am2320
-    corrosion_sensor = adafruit_am2320.AM2320(board.I2C())  # indoor sensor
-    corrosion_sensor.heater = False  # turn heater OFF"""
-
-    # Stemma-attached local sensor BME680
-    SENSOR_DELAY = 0
-    SENSOR_HEAT = False
-    SENSOR_TEMP_OFFSET = -1
-    import adafruit_bme680
-    corrosion_sensor = adafruit_bme680.Adafruit_BME680_I2C(board.STEMMA_I2C())  # indoor sensor board
-
-
-def read_local_sensor():
-    """Read the local sensor's temperature and humidity, calculate
-    dew point and corrosion index, and display results."""
-    pixel[0] = FETCH  # Busy
-    display.sensor_icon_mask.fill = None
-    
-    # Display local sensor temperature
-    display.temp_mask.fill = BLACK
-    display.dew_pt_mask.fill = BLACK
-    if MODE == SOURCE_MODE:
-        # Read the local sensor
-        time.sleep(SENSOR_DELAY)  # Wait to read temperature value
-        temp_c = corrosion_sensor.temperature + SENSOR_TEMP_OFFSET
-        if temp_c is not None:
-            temp_c = min(max(temp_c, -40), 85)  # constrain value
-            temp_c = round(temp_c, 1)  # Celsius
-            temp_f = round(celsius_to_fahrenheit(temp_c), 1)  # Fahrenheit
-        else:
-            temp_f = None
-    else:
-        # Get the sensor temperature from AIO feed
-        temp_f = float(get_last_value("shop.int-temperature"))
-        temp_c = round(fahrenheit_to_celsius(temp_f), 1)  # Celsius
-    display.temperature.text = f"{temp_f:.1f}°"
-    display.temp_mask.fill = None
-    
-    # Display local sensor humidity
-    display.humid_mask.fill = BLACK
-    if MODE == SOURCE_MODE:
-        time.sleep(SENSOR_DELAY)  # Wait to read humidity value
-        humid_pct = corrosion_sensor.relative_humidity
-        if humid_pct is not None:
-            humid_pct = min(max(humid_pct, 0), 100)  # constrain value
-            humid_pct = round(humid_pct, 1)
-    else:
-        # Get the sensor humidity from AIO feed
-        humid_pct = float(get_last_value("shop.int-humidity"))
-    display.humidity.text = f"{humid_pct:.0f}%"
-    display.humid_mask.fill = None
-
-    # Display dew point
-    if None in (temp_c, humid_pct):
-        dew_c = None
-        dew_f = None
-    else:
-        dew_c, _ = dew_point_calc(temp_c, humid_pct)
-        dew_f = round(celsius_to_fahrenheit(dew_c), 1)
-    display.dew_point.text = f"{dew_f:.1f}°"
-    display.dew_pt_mask.fill = None
-    
-    display.sensor_icon_mask.fill = LCARS_LT_BLU
-    pixel[0] = NORMAL  # Success
-    
-    # Calculate and display corrosion index value.
-    #   Turn on sensor heater when index = 2 (ALERT);
-    #   heater turns off for other corrosion index conditions.
-    if (temp_c <= dew_c + 2) or humid_pct >= 80:
-        corrosion_index = 2  # CORROSION ALERT
-        display.status_icon.fill = RED
-        display.status.color = BLACK
-        display.status.text = "ALERT"
-        display.alert("CORROSION ALERT")
-        if MODE == SOURCE_MODE and SENSOR_HEAT:
-            corrosion_sensor.heater = True  # turn heater ON
-            display.heater_icon_mask.fill = None
-            
-    elif temp_c <= dew_c + 5:
-        corrosion_index = 1  # CORROSION WARNING
-        display.status_icon.fill = YELLOW
-        display.status.color = RED
-        display.status.text = "WARN"
-        display.alert("CORROSION WARNING")
-        if MODE == SOURCE_MODE and SENSOR_HEAT:
-            corrosion_sensor.heater = False  # turn heater OFF
-        display.heater_icon_mask.fill = LCARS_LT_BLU
-
-    else:
-        corrosion_index = 0  # NORMAL
-        display.status_icon.fill = LT_GRN
-        display.status.color = BLACK
-        display.status.text = "OK"
-        display.alert("NORMAL")
-        if MODE == SOURCE_MODE and SENSOR_HEAT:
-            corrosion_sensor.heater = False  # turn heater OFF
-        display.heater_icon_mask.fill = LCARS_LT_BLU
-            
-    display.sensor_icon_mask.fill = LCARS_LT_BLU
-
-    return temp_f, humid_pct, dew_f, corrosion_index
 
 
 def read_cpu_temp():
@@ -239,9 +121,11 @@ def get_last_value(feed_key):
     pixel[0] = FETCH
     display.wifi_icon_mask.fill = None
     try:
-        # print(f"throttle limit: {pyportal.network.io_client.get_remaining_throttle_limit()}")
+        # print(f"throttle limit: {io.get_remaining_throttle_limit()}")
         while io.get_remaining_throttle_limit() <= 10:
+            pixel[0] = THROTTLE_DELAY
             time.sleep(1)  # Wait until throttle limit increases
+        pixel[0] = FETCH
         last_value = io.receive_data(feed_key)["value"]
     except Exception as aio_feed_error:
         pixel[0] = ERROR
@@ -256,47 +140,12 @@ def get_last_value(feed_key):
     return last_value
 
 
-def publish_to_aio(value, feed, xmit=True):
-    """Publish a value to an AIO feed, while monitoring checking the throttle
-    transaction rate. A blocking method.
-    :param union(int, float, str) value: The value to publish.
-    :param str feed: The name of the AIO feed.
-    :param bool xmit: True to enable transmitting to AIO. False for local display only.
-    """
-    pixel[0] = FETCH  # Busy (yellow)
-    display.wifi_icon_mask.fill = None
-    if value is not None:
-        if xmit:
-            try:
-                while io.get_remaining_throttle_limit() <= 10:
-                    time.sleep(1)  # Wait until throttle limit increases
-                io.send_data(feed, value)
-                print(f"SEND '{value}' -> {feed}")
-            except Exception as aio_publish_error:
-                pixel[0] = ERROR  # Error
-                display.image_group = None
-                print(f"FAIL: '{value}' -> {feed}")
-                print(f"  {str(aio_publish_error)}")
-                print("  MCU will soft reset in 30 seconds.")
-                busy(30)
-                supervisor.reload()  # soft reset: keeps the terminal session alive
-        else:
-            print(f"DISP '{value}' {feed}")
-    else:
-        print(f"FAIL: '{value}' for {feed}")
-
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
-    pixel[0] = NORMAL  # Success
-
-
 def busy(delay):
     """An alternative 'time.sleep' function that blinks the LED once per second.
     Time display is updated from localtime each second. A blocking method.
     :param float delay: The time delay in seconds. No default."""
     global clock_tick
     for blinks in range(int(round(delay, 0))):
-        if blinks % SENSOR_INTERVAL == 0 and MODE == SOURCE_MODE:
-            read_local_sensor()
         start = time.monotonic()
         if clock_tick:
             display.clock_tick_mask.fill = YELLOW
@@ -316,7 +165,7 @@ def busy(delay):
         local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
         display.clock_digits.text = local_time
 
-        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.1f}°  {SAMPLE_INTERVAL - blinks}"
+        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.0f}°  {SAMPLE_INTERVAL - blinks}"
 
         delay = max((1 - (time.monotonic() - start)), 0)
         time.sleep(delay)
@@ -348,7 +197,7 @@ def update_local_time():
     display.clock_day_mon_yr.text = (
         f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
-    print(display.clock_day_mon_yr.text)
+    # print(display.clock_day_mon_yr.text)
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
@@ -381,9 +230,6 @@ pixel[0] = NORMAL  # Success
 weather_table = None
 weather_table_old = None
 
-# Create an instance of the Adafruit IO HTTP client
-# https://docs.circuitpython.org/projects/adafruitio/en/stable/api.html
-
 # Initialize a socket pool and requests session
 pixel[0] = FETCH  # Busy
 display.wifi_icon_mask.fill = None
@@ -412,44 +258,87 @@ while True:
     print("-" * 35)
 
     # Read the local temperature and humidity sensor
-    sens_temp, sens_humid, sens_dew_pt, sens_index = read_local_sensor()
+    print("Workshop Conditions")
+    """Read the workshop sensor's temperature and humidity, calculate
+    dew point and corrosion index, and display results."""
+    pixel[0] = FETCH  # Busy
+    display.sensor_icon_mask.fill = None
 
-    publish_to_aio(
-        int(round(time.monotonic() / 60, 0)),
-        "system-watchdog",
-        xmit=XMIT_SENSOR,
-    )
+    # Get the sensor temperature from AIO feed
+    display.temp_mask.fill = BLACK
+    display.dew_pt_mask.fill = BLACK
+    temp_f = float(get_last_value("shop.int-temperature"))
+    temp_c = round(fahrenheit_to_celsius(temp_f), 1)  # Celsius
+    display.temperature.text = f"{temp_f:.0f}°"
+    print(f"  Temp  {display.temperature.text}")
+    display.temp_mask.fill = None
 
-    # Publish local sensor data
-    display.wifi_icon_mask.fill = None
-    # fmt: off
-    publish_to_aio(sens_temp,      "shop.int-temperature", xmit=XMIT_SENSOR)
-    publish_to_aio(sens_humid,     "shop.int-humidity",    xmit=XMIT_SENSOR)
-    publish_to_aio(sens_dew_pt,    "shop.int-dewpoint",    xmit=XMIT_SENSOR)
-    publish_to_aio(sens_index,     "shop.int-corrosion-index",  xmit=XMIT_SENSOR)
-    publish_to_aio(
-        f"{read_cpu_temp():.2f}",  "shop.int-pcb-temperature",  xmit=XMIT_SENSOR
-    )
-    # fmt: on
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
-    
+    # Get the sensor humidity from AIO feed
+    display.humid_mask.fill = BLACK
+    humid_pct = float(get_last_value("shop.int-humidity"))
+    display.humidity.text = f"{humid_pct:.0f}%"
+    print(f"  Humid {display.humidity.text}")
+    display.humid_mask.fill = None
+
+    # Display dew point
+    if None in (temp_c, humid_pct):
+        dew_c = None
+        dew_f = None
+    else:
+        dew_c, _ = dew_point_calc(temp_c, humid_pct)
+        dew_f = round(celsius_to_fahrenheit(dew_c), 1)
+    display.dew_point.text = f"{dew_f:.0f}°"
+    print(f"  Dew   {display.dew_point.text}")
+    display.dew_pt_mask.fill = None
+
+    display.sensor_icon_mask.fill = LCARS_LT_BLU
+    pixel[0] = NORMAL  # Success
+
+    # Calculate and display corrosion index value.
+    #   Turn on sensor heater when index = 2 (ALERT);
+    #   heater turns off for other corrosion index conditions.
+    if (temp_c <= dew_c + 2) or humid_pct >= 80:
+        corrosion_index = 2  # CORROSION ALERT
+        display.status_icon.fill = RED
+        display.status.color = BLACK
+        display.status.text = "ALERT"
+        display.alert("CORROSION ALERT")
+
+    elif temp_c <= dew_c + 5:
+        corrosion_index = 1  # CORROSION WARNING
+        display.status_icon.fill = YELLOW
+        display.status.color = RED
+        display.status.text = "WARN"
+        display.alert("CORROSION WARNING")
+
+    else:
+        corrosion_index = 0  # NORMAL
+        display.status_icon.fill = LT_GRN
+        display.status.color = BLACK
+        display.status.text = "OK"
+        display.alert("NORMAL")
+
+    display.sensor_icon_mask.fill = LCARS_LT_BLU
+
     print("-" * 35)
 
     # Receive and update the conditions from AIO+ Weather
     pixel[0] = FETCH  # AIO+ Weather fetch in progress (yellow)
     display.wifi_icon_mask.fill = None
     try:
-        while io.get_remaining_throttle_limit() <= 2:
+        while io.get_remaining_throttle_limit() <= 10:
+            pixel[0] = THROTTLE_DELAY
             time.sleep(1)  # Wait until throttle limit increases
+        pixel[0] = FETCH
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
     except Exception as receive_weather_error:
-        if NEOPIXEL: pixel[0] = ERROR  # Error (red)
+        pixel[0] = ERROR  # Error (red)
         display.image_group = None
         print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
         print("  MCU will soft reset in 30 seconds.")
         busy(30)
         supervisor.reload()  # soft reset: keeps the terminal session alive
-    
+
     # print(weather_table)  # This is a very large json table
     # print("... weather table received ...")
     display.wifi_icon_mask.fill = LCARS_LT_BLU
@@ -459,31 +348,43 @@ while True:
         forecast_table = weather_table["forecast_days_1"]  # for sunrise/sunset
         weather_table = weather_table["current"]  # extract a subset and reduce size
         if weather_table != weather_table_old:
-            table_desc = weather_table["conditionCode"]
-            
-            display.temp_mask.fill = BLACK
-            table_temp = f"{celsius_to_fahrenheit(weather_table['temperature']):.1f}"
-            display.ext_temp.text = f"{table_temp}°"
-            
-            display.humid_mask.fill = BLACK
-            table_humid = f"{weather_table['humidity'] * 100:.1f}"
-            display.ext_humid.text = f"{table_humid[:-2]}%"
-            
+            print("Exterior Conditions")
             display.dew_pt_mask.fill = BLACK
-            table_dew_point = f"{weather_table['temperatureDewPoint']:.1f}"
-            display.ext_dew.text = (
-            f"{celsius_to_fahrenheit(float(table_dew_point)):.1f}°")
-            display.dew_pt_mask.fill = None
-            
+            display.temp_mask.fill = BLACK
+            display.humid_mask.fill = BLACK
             display.wind_mask.fill = BLACK
+            display.gusts_mask.fill = BLACK
+            
+            table_desc = weather_table["conditionCode"]
+            print(f"  {table_desc}")
+
+            table_temp = f"{celsius_to_fahrenheit(weather_table['temperature']):.0f}"
+            display.ext_temp.text = f"{table_temp}°"
+            print(f"  Temp  {display.ext_temp.text}")
+
+            table_humid = f"{float(weather_table['humidity']) * 100:.0f}"
+            display.ext_humid.text = f"{table_humid}%"
+            print(f"  Humid {display.ext_humid.text}")
+
+            table_dew_point = f"{weather_table['temperatureDewPoint']:.0f}"
+            display.ext_dew.text = (
+            f"{celsius_to_fahrenheit(float(table_dew_point)):.0f}°")
+            print(f"  Dew   {display.ext_dew.text}")
+            display.dew_pt_mask.fill = None
+            display.temp_mask.fill = None
+            display.humid_mask.fill = None
+
             table_wind_speed = f"{weather_table['windSpeed'] * 0.6214:.0f}"
             table_wind_dir = wind_direction(weather_table["windDirection"])
             display.ext_wind.text = f"{table_wind_dir} {table_wind_speed}"
-            
-            display.gusts_mask.fill = BLACK
+            print(f"  Wind  {display.ext_wind.text} MPH")
+            display.wind_mask.fill = None
+
             table_wind_gusts = f"{weather_table['windGust'] * 0.6214:.0f}"
             display.ext_gusts.text = table_wind_gusts
-            
+            print(f"  Gusts {display.ext_gusts.text} MPH")
+            display.gusts_mask.fill = None
+
             table_timestamp = weather_table["metadata"]["readTime"]
             table_daylight = weather_table["daylight"]
 
@@ -512,42 +413,12 @@ while True:
                 sunset_hr = 12
             display.ext_sunset.text = f"set  {sunset_hr:02d}:{table_sunset.tm_min:02d}"
 
-            # Build a composite feed value
-            composite_tuple = f"{str(table_daylight)},{display.ext_sunrise.text[-5:]},{display.ext_sunset.text[-5:]}"
-            # print(composite_tuple)
-
-            # Publish table data
-            publish_to_aio(
-                int(round(time.monotonic() / 60, 0)),
-                "system-watchdog",
-                xmit=XMIT_WEATHER,
-            )
-            # fmt: off
-            publish_to_aio(table_desc,       "weather-description", xmit=XMIT_WEATHER)
-            publish_to_aio(table_humid,      "weather-humidity",    xmit=XMIT_WEATHER)
-            display.humid_mask.fill = None
-            publish_to_aio(table_temp,       "weather-temperature", xmit=XMIT_WEATHER)
-            display.temp_mask.fill = None
-            publish_to_aio(table_wind_dir,   "weather-winddirection", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_speed, "weather-windspeed",    xmit=XMIT_WEATHER)
-            display.wind_mask.fill = None
-            publish_to_aio(table_wind_gusts, "weather-windgusts",    xmit=XMIT_WEATHER)
-            display.gusts_mask.fill = None
-            publish_to_aio(str(table_daylight), "weather-daylight",  xmit=XMIT_WEATHER)
-            # fmt: on
-
-            """# Test of composite feed value
-            publish_to_aio(composite_tuple, "weather-daylight", xmit=True)
-            #print(dir(io))
-            feed_value = io.receive_data("weather-daylight")["value"].split(",")
-            print("***", feed_value[0], feed_value[1], feed_value[2])"""
-
             weather_table_old = weather_table  # to watch for changes
         else:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
-        print(f"NOTE Cooling fan state: {fan.value}")
+        print(f"NOTE Cooling fan state: {fan.value}  CPU: {read_cpu_temp():.0f}°")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:

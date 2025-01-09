@@ -3,7 +3,7 @@
 """
 source_display_graphics.py
 
-Builds the display graphics class for the Weather Source device.
+Builds the display graphics class for the Weather Source and Display devices.
 For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
 """
 
@@ -93,6 +93,7 @@ class Display:
 
         self._display.root_group = self.image_group  # Load display
 
+        # Weather Description Icon; image_group[1]
         desc_icon = displayio.OnDiskBitmap("/cedar_grove_blue_120x50.bmp")
         icon = displayio.TileGrid(
             desc_icon, pixel_shader=desc_icon.pixel_shader, x=29, y=225
@@ -139,51 +140,51 @@ class Display:
         self.image_group.append(self.wifi_icon_mask)
 
         # Data Status Masks
-        self.temp_mask = Rect(295, 82, 20, 18, fill=None, outline=None, stroke=0)
+        self.temp_mask = Rect(295, 82, 20, 18, fill=BLACK, outline=None, stroke=0)
         self.image_group.append(self.temp_mask)
-        self.humid_mask = Rect(295, 105, 20, 18, fill=None, outline=None, stroke=0)
+        self.humid_mask = Rect(295, 105, 20, 18, fill=BLACK, outline=None, stroke=0)
         self.image_group.append(self.humid_mask)
-        self.dew_pt_mask = Rect(295, 127, 20, 18, fill=None, outline=None, stroke=0)
+        self.dew_pt_mask = Rect(295, 127, 20, 18, fill=BLACK, outline=None, stroke=0)
         self.image_group.append(self.dew_pt_mask)
-        self.wind_mask = Rect(295, 172, 20, 18, fill=None, outline=None, stroke=0)
+        self.wind_mask = Rect(295, 172, 20, 18, fill=BLACK, outline=None, stroke=0)
         self.image_group.append(self.wind_mask)
-        self.gusts_mask = Rect(295, 194, 20, 18, fill=None, outline=None, stroke=0)
+        self.gusts_mask = Rect(295, 194, 20, 18, fill=BLACK, outline=None, stroke=0)
         self.image_group.append(self.gusts_mask)
 
         # Corrosion Status Icon and Text
         self.status_icon = Triangle(
-            95, 155, 130, 210, 60, 210, fill=LCARS_LT_BLU, outline=None
+            89, 155, 124, 210, 54, 210, fill=LCARS_LT_BLU, outline=None
         )
         self.image_group.append(self.status_icon)
 
         self.status = Label(ORBITRON_LIGHT_12, text=" ", color=WHITE)
         self.status.anchor_point = (0.5, 0.5)
-        self.status.anchored_position = (95, 200)
+        self.status.anchored_position = (89, 200)
         self.image_group.append(self.status)
 
         ## Define text labels
         # Temperature
         self.temperature = Label(ORBITRON_BOLD_24, text=" ", color=WHITE)
         self.temperature.anchor_point = (1.0, 0.5)
-        self.temperature.anchored_position = (120, 90)
+        self.temperature.anchored_position = (114, 90)
         self.image_group.append(self.temperature)
 
         # Humidity
         self.humidity = Label(ORBITRON_BOLD_18, text=" ", color=CYAN)
         self.humidity.anchor_point = (1.0, 0.5)
-        self.humidity.anchored_position = (120, 115)
+        self.humidity.anchored_position = (131, 115)
         self.image_group.append(self.humidity)
 
         # Dew Point
         self.dew_point = Label(ORBITRON_BOLD_18, text=" ", color=PINK)
         self.dew_point.anchor_point = (1.0, 0.5)
-        self.dew_point.anchored_position = (120, 137)
+        self.dew_point.anchored_position = (114, 137)
         self.image_group.append(self.dew_point)
 
         # Exterior Temperature
         self.ext_temp = Label(ORBITRON_BOLD_24, text=" ", color=WHITE)
         self.ext_temp.anchor_point = (1.0, 0.5)
-        self.ext_temp.anchored_position = (210, 90)
+        self.ext_temp.anchored_position = (194, 90)
         self.image_group.append(self.ext_temp)
 
         # Exterior Humidity
@@ -195,7 +196,7 @@ class Display:
         # Exterior Dew Point
         self.ext_dew = Label(ORBITRON_BOLD_18, text=" ", color=PINK)
         self.ext_dew.anchor_point = (1.0, 0.5)
-        self.ext_dew.anchored_position = (210, 137)
+        self.ext_dew.anchored_position = (194, 137)
         self.image_group.append(self.ext_dew)
 
         # Exterior Wind Speed
@@ -251,7 +252,7 @@ class Display:
         self.pcb_temp.anchor_point = (1.0, 0.5)
         self.pcb_temp.anchored_position = (445, 302)
         self.image_group.append(self.pcb_temp)
-        
+
         # Mode Description
         self.mode = Label(ORBITRON_LIGHT_12, text=" ", color=BLACK)
         self.mode.anchor_point = (0.5, 0.5)
