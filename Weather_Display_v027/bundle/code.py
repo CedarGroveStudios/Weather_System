@@ -41,28 +41,12 @@ display = Display(rotation=ROTATION, brightness=BRIGHTNESS)
 WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", ]
 
-# Default colors
-BLACK   = 0x000000
-RED     = 0xFF0000
-ORANGE  = 0xFF8811
-YELLOW  = 0xFFFF00
-GREEN   = 0x00FF00
-LT_GRN  = 0x5dd82f
-CYAN    = 0x00FFFF
-BLUE    = 0x0000FF
-LT_BLUE = 0x000044
-VIOLET  = 0x9900FF
-DK_VIO  = 0x110022
-WHITE   = 0xFFFFFF
-GRAY    = 0x444455
-LCARS_LT_BLU = 0x07A2FF
-
-# Define a few states and mode values
-STARTUP = VIOLET
-NORMAL  = LCARS_LT_BLU
-FETCH   = YELLOW
-ERROR   = RED
-THROTTLE_DELAY = GREEN
+# Define a few state and mode colors
+STARTUP = display.VIOLET
+NORMAL = display.LCARS_LT_BLU
+FETCH = display.YELLOW
+ERROR = display.RED
+THROTTLE_DELAY = display.LT_GRN
 # fmt: on
 
 # Operating Mode
@@ -135,7 +119,7 @@ def get_last_value(feed_key):
         print("  MCU will soft reset in 30 seconds.")
         busy(30)
         supervisor.reload()  # soft reset: keeps the terminal session alive
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    display.wifi_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Success
     return last_value
 
@@ -148,7 +132,7 @@ def busy(delay):
     for blinks in range(int(round(delay, 0))):
         start = time.monotonic()
         if clock_tick:
-            display.clock_tick_mask.fill = YELLOW
+            display.clock_tick_mask.fill = display.YELLOW
             led.value = True
         else:
             display.clock_tick_mask.fill = None
@@ -165,7 +149,7 @@ def busy(delay):
         local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
         display.clock_digits.text = local_time
 
-        display.pcb_temp.text = f"{gc.mem_free()/10**6:.3f} Mb  {read_cpu_temp():.0f}°  {SAMPLE_INTERVAL - blinks}"
+        display.pcb_temp.text = f"{gc.mem_free() / 10 ** 6:.3f} Mb  {read_cpu_temp():.0f}°  {SAMPLE_INTERVAL - blinks}"
 
         delay = max((1 - (time.monotonic() - start)), 0)
         time.sleep(delay)
@@ -201,8 +185,8 @@ def update_local_time():
     print(
         f"Time: {local_time} {WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
     )
-    display.clock_icon_mask.fill = LCARS_LT_BLU
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    display.clock_icon_mask.fill = display.LCARS_LT_BLU
+    display.wifi_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Normal
 
 
@@ -223,7 +207,7 @@ except Exception as wifi_access_error:
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
-display.wifi_icon_mask.fill = LCARS_LT_BLU
+display.wifi_icon_mask.fill = display.LCARS_LT_BLU
 pixel[0] = NORMAL  # Success
 
 # Initialize the weather_table and history variables
@@ -245,7 +229,7 @@ except Exception as aio_client_error:
     print("    MCU will soft reset in 30 seconds.")
     busy(30)
     supervisor.reload()  # soft reset: keeps the terminal session alive
-display.wifi_icon_mask.fill = LCARS_LT_BLU
+display.wifi_icon_mask.fill = display.LCARS_LT_BLU
 pixel[0] = NORMAL  # Normal
 
 ### PRIMARY LOOP ###
@@ -265,8 +249,8 @@ while True:
     display.sensor_icon_mask.fill = None
 
     # Get the sensor temperature from AIO feed
-    display.temp_mask.fill = BLACK
-    display.dew_pt_mask.fill = BLACK
+    display.temp_mask.fill = display.BLACK
+    display.dew_pt_mask.fill = display.BLACK
     temp_f = float(get_last_value("shop.int-temperature"))
     temp_c = round(fahrenheit_to_celsius(temp_f), 1)  # Celsius
     display.temperature.text = f"{temp_f:.0f}°"
@@ -274,7 +258,7 @@ while True:
     display.temp_mask.fill = None
 
     # Get the sensor humidity from AIO feed
-    display.humid_mask.fill = BLACK
+    display.humid_mask.fill = display.BLACK
     humid_pct = float(get_last_value("shop.int-humidity"))
     display.humidity.text = f"{humid_pct:.0f}%"
     print(f"  Humid {display.humidity.text}")
@@ -291,7 +275,7 @@ while True:
     print(f"  Dew   {display.dew_point.text}")
     display.dew_pt_mask.fill = None
 
-    display.sensor_icon_mask.fill = LCARS_LT_BLU
+    display.sensor_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Success
 
     # Calculate and display corrosion index value.
@@ -299,26 +283,26 @@ while True:
     #   heater turns off for other corrosion index conditions.
     if (temp_c <= dew_c + 2) or humid_pct >= 80:
         corrosion_index = 2  # CORROSION ALERT
-        display.status_icon.fill = RED
-        display.status.color = BLACK
+        display.status_icon.fill = display.RED
+        display.status.color = display.BLACK
         display.status.text = "ALERT"
         display.alert("CORROSION ALERT")
 
     elif temp_c <= dew_c + 5:
         corrosion_index = 1  # CORROSION WARNING
-        display.status_icon.fill = YELLOW
-        display.status.color = RED
+        display.status_icon.fill = display.YELLOW
+        display.status.color = display.RED
         display.status.text = "WARN"
         display.alert("CORROSION WARNING")
 
     else:
         corrosion_index = 0  # NORMAL
-        display.status_icon.fill = LT_GRN
-        display.status.color = BLACK
+        display.status_icon.fill = display.LT_GRN
+        display.status.color = display.BLACK
         display.status.text = "OK"
         display.alert("NORMAL")
 
-    display.sensor_icon_mask.fill = LCARS_LT_BLU
+    display.sensor_icon_mask.fill = display.LCARS_LT_BLU
 
     print("-" * 35)
 
@@ -341,22 +325,28 @@ while True:
 
     # print(weather_table)  # This is a very large json table
     # print("... weather table received ...")
-    display.wifi_icon_mask.fill = LCARS_LT_BLU
+    display.wifi_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Success
 
     if weather_table:
         forecast_table = weather_table["forecast_days_1"]  # for sunrise/sunset
         weather_table = weather_table["current"]  # extract a subset and reduce size
         if weather_table != weather_table_old:
+            table_timestamp = weather_table["metadata"]["readTime"]
+            table_daylight = weather_table["daylight"]
+            display.select_palette(table_daylight)
+
             print("Exterior Conditions")
-            display.dew_pt_mask.fill = BLACK
-            display.temp_mask.fill = BLACK
-            display.humid_mask.fill = BLACK
-            display.wind_mask.fill = BLACK
-            display.gusts_mask.fill = BLACK
-            
+            display.dew_pt_mask.fill = display.BLACK
+            display.temp_mask.fill = display.BLACK
+            display.humid_mask.fill = display.BLACK
+            display.wind_mask.fill = display.BLACK
+            display.gusts_mask.fill = display.BLACK
+
             table_desc = weather_table["conditionCode"]
             print(f"  {table_desc}")
+            display.display_icon(table_desc, table_daylight)
+            display.ext_desc.text = table_desc
 
             table_temp = f"{celsius_to_fahrenheit(weather_table['temperature']):.0f}"
             display.ext_temp.text = f"{table_temp}°"
@@ -368,7 +358,7 @@ while True:
 
             table_dew_point = f"{weather_table['temperatureDewPoint']:.0f}"
             display.ext_dew.text = (
-            f"{celsius_to_fahrenheit(float(table_dew_point)):.0f}°")
+                f"{celsius_to_fahrenheit(float(table_dew_point)):.0f}°")
             print(f"  Dew   {display.ext_dew.text}")
             display.dew_pt_mask.fill = None
             display.temp_mask.fill = None
@@ -384,12 +374,6 @@ while True:
             display.ext_gusts.text = table_wind_gusts
             print(f"  Gusts {display.ext_gusts.text} MPH")
             display.gusts_mask.fill = None
-
-            table_timestamp = weather_table["metadata"]["readTime"]
-            table_daylight = weather_table["daylight"]
-
-            display.display_icon(table_desc, table_daylight)
-            display.ext_desc.text = table_desc
 
             table_sunrise = datetime.fromisoformat(forecast_table["sunrise"]).timetuple()
             sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
