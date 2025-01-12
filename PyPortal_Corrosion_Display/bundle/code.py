@@ -224,13 +224,6 @@ def toggle_clock_tick():
 
 def update_display():
     """Fetch last values and update the display."""
-    sensor_icon_mask.fill = None
-
-    pcb_temp.text = f"{read_pcb_temperature():.1f}°"
-    temperature.text = f"{float(get_last_value("shop.int-temperature")):.1f}°"
-    humidity.text = f"{float(get_last_value("shop.int-humidity")):.0f}%"
-    dew_point.text = f"{float(get_last_value("shop.int-dewpoint")):.1f}° Dew"
-
     # Get the local time and provide hour-of-day for is_daytime method
     clock_icon_mask.fill = None
     wifi_icon_mask.fill = None
@@ -239,7 +232,6 @@ def update_display():
     except Exception as e:
         print(f"Error fetching local time: {e}")
 
-    clock_icon_mask.fill = LCARS_LT_BLU
     wifi_icon_mask.fill = LCARS_LT_BLU
 
     if time.localtime().tm_hour > 12:
@@ -258,6 +250,16 @@ def update_display():
     day = time.localtime().tm_mday
     year = time.localtime().tm_year
     clock_day_mon_yr.text = f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
+    
+    clock_icon_mask.fill = LCARS_LT_BLU
+    
+    # Get the workshop sensor data and update the display
+    sensor_icon_mask.fill = None
+
+    pcb_temp.text = f"{read_pcb_temperature():.1f}°"
+    temperature.text = f"{float(get_last_value("shop.int-temperature")):.1f}°"
+    humidity.text = f"{float(get_last_value("shop.int-humidity")):.0f}%"
+    dew_point.text = f"{float(get_last_value("shop.int-dewpoint")):.1f}° Dew"
 
     # Display the corrosion status. Default is no corrosion potential (0 = GREEN).
     corrosion_index = float(get_last_value("shop.int-corrosion-index"))
@@ -317,9 +319,9 @@ def adjust_brightness():
 
 
 def read_pcb_temperature():
-    """Read the current PCB temperature value in degrees F"""
-    return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
-    return
+        """Read the current PCB temperature value in degrees F"""
+        return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
+        return
 
 
 last_weather_update = time.monotonic()
@@ -330,6 +332,7 @@ watchdog = get_last_value("system-watchdog")
 previous_watchdog = watchdog
 
 update_display()  # Fetch initial data from AIO
+
 
 ### Main Loop ###
 while True:
