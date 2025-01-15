@@ -201,8 +201,8 @@ def get_last_value(feed_key):
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
         wifi_icon_mask.fill = LCARS_LT_BLU
         return last_value
-    except (KeyError, IndexError, TimeoutError, BrokenPipeError, RuntimeError) as e:
-        # 372, 376 in adafruit_esp32spi._wait_spi_char
+    except Exception as e:
+        # Persistent PyPortal hardware issue: 372, 376 in adafruit_esp32spi._wait_spi_char
         print(f"Error fetching data from feed {feed_key}: {e}")
         print("  MCU will soft reset in 30 seconds.")
         time.sleep(30)
@@ -250,9 +250,9 @@ def update_display():
     day = time.localtime().tm_mday
     year = time.localtime().tm_year
     clock_day_mon_yr.text = f"{WEEKDAY[wday]}  {MONTH[month - 1]} {day:02d}, {year:04d}"
-    
+
     clock_icon_mask.fill = LCARS_LT_BLU
-    
+
     # Get the workshop sensor data and update the display
     sensor_icon_mask.fill = None
 
