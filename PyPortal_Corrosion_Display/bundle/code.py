@@ -194,8 +194,9 @@ def get_last_value(feed_key):
     :param str feed_key: The AIO feed key."""
     wifi_icon_mask.fill = None
     try:
-        # print(f"throttle limit: {pyportal.network.io_client.get_remaining_throttle_limit()}")
-        while pyportal.network.io_client.get_remaining_throttle_limit() <= 10:
+        throttle_limit = pyportal.network.io_client.get_remaining_throttle_limit()
+        # print(f"throttle limit: {throttle_limit}")
+        while throttle_limit <= 10 or throttle_limit is None:
             time.sleep(1)  # Wait until throttle limit increases
         time.sleep(1)  # Wait after throttle check query to retrieve feed
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
@@ -321,7 +322,6 @@ def adjust_brightness():
 def read_pcb_temperature():
         """Read the current PCB temperature value in degrees F"""
         return round(celsius_to_fahrenheit(corrosion_sensor.temperature), 1)
-        return
 
 
 last_weather_update = time.monotonic()

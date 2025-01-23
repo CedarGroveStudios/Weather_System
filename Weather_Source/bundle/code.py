@@ -320,7 +320,8 @@ while True:
     # Receive and update the conditions from AIO+ Weather
     try:
         pixel[0] = 0xFFFF00  # AIO+ Weather fetch in progress (yellow)
-        while io.get_remaining_throttle_limit() <= 2:
+        throttle_limit = io.get_remaining_throttle_limit()
+        while throttle_limit <= 2 or throttle_limit is None:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
         # print(weather_table)  # This is a very large json table
