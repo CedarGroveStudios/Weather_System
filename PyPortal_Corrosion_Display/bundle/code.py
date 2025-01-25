@@ -194,11 +194,9 @@ def get_last_value(feed_key):
     :param str feed_key: The AIO feed key."""
     wifi_icon_mask.fill = None
     try:
-        throttle_limit = pyportal.network.io_client.get_remaining_throttle_limit()
-        # print(f"throttle limit: {throttle_limit}")
-        while throttle_limit <= 10 or throttle_limit is None:
+        # print(f"throttle limit: {pyportal.network.io_client.get_remaining_throttle_limit()}")
+        while pyportal.network.io_client.get_remaining_throttle_limit() <= 10:
             time.sleep(1)  # Wait until throttle limit increases
-        time.sleep(1)  # Wait after throttle check query to retrieve feed
         last_value = pyportal.network.io_client.receive_data(feed_key)["value"]
         wifi_icon_mask.fill = LCARS_LT_BLU
         return last_value
@@ -376,4 +374,4 @@ while True:
     clock_digits.text = display_time
 
     adjust_brightness()
-    time.sleep(1)
+    time.sleep(0.682)  # To adjust for 1.0 sec per loop

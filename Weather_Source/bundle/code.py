@@ -51,7 +51,7 @@ BRIGHTNESS = 0.50
 ROTATION = 180
 
 # Cooling fan threshold
-FAN_ON_TRESHOLD_F = 100  # Degrees Farenheit
+FAN_ON_TRESHOLD_F = 100  # Degrees Fahrenheit
 
 # fmt: off
 # A couple of day/month lookup tables
@@ -228,10 +228,10 @@ def busy(delay):
     for blinks in range(int(round(delay, 0))):
         led.value = True
         # pixel[0] = 0x808080
-        time.sleep(0.05)
+        time.sleep(0.498)
         led.value = False
         # pixel[0] = neo_color
-        time.sleep(0.95)
+        time.sleep(0.500)
 
 
 def update_local_time():
@@ -320,8 +320,7 @@ while True:
     # Receive and update the conditions from AIO+ Weather
     try:
         pixel[0] = 0xFFFF00  # AIO+ Weather fetch in progress (yellow)
-        throttle_limit = io.get_remaining_throttle_limit()
-        while throttle_limit <= 2 or throttle_limit is None:
+        while io.get_remaining_throttle_limit() <= 10:
             time.sleep(1)  # Wait until throttle limit increases
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
         # print(weather_table)  # This is a very large json table
