@@ -108,7 +108,7 @@ def read_local_sensor():
     busy(3)  # Wait to read temperature value
     try:
         temp_c = corrosion_sensor.temperature
-    except Exception as read_sensor_error:
+    except (Exception, OSError) as read_sensor_error:
         print("FAIL: Read Sensor Error")
         print(f"  {str(read_sensor_error)}")
         print("  MCU will soft reset in 30 seconds.")

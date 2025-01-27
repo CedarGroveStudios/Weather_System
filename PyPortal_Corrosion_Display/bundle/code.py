@@ -30,9 +30,9 @@ from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
 board.DISPLAY.brightness = 0
 
 # AIO Weather Receiver Parameters
-SAMPLE_INTERVAL = 120  # Check corrosion conditions (seconds)
-QUALITY_THRESHOLD = 8  # Quality warning when less than threshold (out of 10)
-BRIGHTNESS = 0.75
+SAMPLE_INTERVAL = 600  # Check corrosion conditions (seconds)
+QUALITY_THRESHOLD = 8  # Quality warning threshold (out of 10)
+BRIGHTNESS = 0.75  # Maximum display and neopixel brightness
 
 # fmt: off
 WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
