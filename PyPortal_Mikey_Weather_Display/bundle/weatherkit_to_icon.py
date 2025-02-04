@@ -1,8 +1,9 @@
 # Apple WeatherKit to openweathermap icon code translator
 #   WeatherCondition, description, openweathermap icon code, matrix icon index
 
-kit_to_map_icon = {
-    "BlowingDust":   ["Blowing dust or sand.", "50", 8],
+# fmt: off
+kit_to_icon = {
+    "BlowingDust":   ["Blowing dust or sand.", "21", 8],
     "Clear":         ["Clear.", "01", 0],
     "Cloudy":        ["Cloudy, overcast.", "04", 3],
     "Foggy":         ["Fog.", "50", 8],
@@ -11,8 +12,8 @@ kit_to_map_icon = {
     "MostlyCloudy":  ["Mostly cloudy.", "03", 2],
     "PartlyCloudy":  ["Partly cloudy.", "02", 1],
     "Smoky":         ["Smoky.", "50", 8],
-    "Breezy":        ["Breezy, light wind.", "50", 8],
-    "Windy":         ["Windy.", "50", 8],
+    "Breezy":        ["Breezy, light wind.", "25", 8],
+    "Windy":         ["Windy.", "26", 8],
     "Drizzle":       ["Drizzle or light rain.", "10", 5],
     "HeavyRain":     ["Heavy rain.", "09", 4],
     "IsolatedThunderstorms":  ["Light thunderstorms.", "11", 6],
@@ -37,3 +38,4 @@ kit_to_map_icon = {
     "Hurricane":     ["Hurricane.", "50", 8],
     "TropicalStorm": ["Tropical storm.", "50", 8],
 }
+# fmt: on

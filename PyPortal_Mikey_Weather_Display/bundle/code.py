@@ -21,7 +21,7 @@ from adafruit_display_text.label import Label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.roundrect import RoundRect
 
-from weatherkit_to_weathmap_icon import kit_to_map_icon
+from weatherkit_to_icon import kit_to_icon
 
 # Set display brightness for startup
 board.DISPLAY.brightness = 0
@@ -236,14 +236,14 @@ def update_display():
     daylight = get_last_value("weather-daylight")
 
     description.text = get_last_value("weather-description")
-    long_desc.text = kit_to_map_icon[description.text][0]
+    long_desc.text = kit_to_icon[description.text][0]
 
     # Create icon filename
     if daylight == "True":
         icon_suffix = "d"
     else:
         icon_suffix = "n"
-    icon_file = f"/icons/{kit_to_map_icon[description.text][1]}{icon_suffix}.bmp"
+    icon_file = f"/icons/{kit_to_icon[description.text][1]}{icon_suffix}.bmp"
     print(f"Icon filename: {icon_file}")
 
     image_group.pop(0)
