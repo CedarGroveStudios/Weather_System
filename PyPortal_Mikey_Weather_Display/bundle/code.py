@@ -291,9 +291,7 @@ def adjust_brightness():
 
 
 last_weather_update = time.monotonic()
-alert("INITIALIZING")
 update_display()  # Fetch initial data from AIO
-alert("READY")
 
 ### Main loop ###
 while True:
@@ -305,6 +303,7 @@ while True:
         last_weather_update = current_time
 
     # Update time every second
+    toggle_clock_tick()
     hour, suffix = am_pm(time.localtime().tm_hour)
     display_time = f"{hour:2d}:{time.localtime().tm_min:02d} {suffix}"
     clock_digits.text = display_time
