@@ -163,15 +163,14 @@ def am_pm(hour):
     12-hour time string.
     :param int hour: The clock hour. No default."""
     if hour < 12:
+        if hour == 0:
+            hour = 12
         return hour, "AM"
     if hour == 12:
         return 12, "PM"
     if hour > 12:
         hour = hour - 12
-        if hour == 0:
-            return 12, "AM"
-        else:
-            return hour, "PM"
+    return hour, "PM"
 
 
 def get_last_value(feed_key):
