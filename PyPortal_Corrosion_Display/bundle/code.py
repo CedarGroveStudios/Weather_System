@@ -374,4 +374,6 @@ while True:
     clock_digits.text = display_time
 
     adjust_brightness()
-    time.sleep(0.682)  # To adjust for 1.0 sec per loop
+    time.sleep(
+        max(min(1.0 - (time.monotonic() - current_time), 1.0), 0)
+    )  # Adjust for processing time
