@@ -30,7 +30,6 @@ board.DISPLAY.brightness = 0
 SAMPLE_INTERVAL = 1200  # Check conditions (seconds)
 BRIGHTNESS = 0.75
 SOUND = True
-ICON = True
 
 # fmt: off
 WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -84,7 +83,7 @@ board.DISPLAY.root_group = image_group  # Load display and watch it build
 ### Define display graphic, label, and value areas
 # Create an icon background layer; image_group[0]
 icon_image = displayio.OnDiskBitmap("/icons/01d.bmp")
-icon_bg = displayio.TileGrid(icon_image, pixel_shader=icon_image.pixel_shader)
+icon_bg = displayio.TileGrid(icon_image, pixel_shader=icon_image.pixel_shader, x=WIDTH//2-80, y=HEIGHT//2-80)
 image_group.append(icon_bg)
 
 clock_day_mon_yr = Label(MEDIUM_FONT, text=" ")
@@ -110,17 +109,17 @@ image_group.append(windspeed)
 
 windgust = Label(SMALL_FONT, text=" ")
 windgust.anchor_point = (0, 0)
-windgust.anchored_position = (10, 68)
+windgust.anchored_position = (10, 65)
 windgust.color = RED
 image_group.append(windgust)
 
-sunrise = Label(SMALL_FONT, text="sunrise")
+sunrise = Label(SMALL_FONT, text=" ")
 sunrise.anchor_point = (1.0, 0.0)
 sunrise.anchored_position = (board.DISPLAY.width - 10, 44)
 sunrise.color = YELLOW
 image_group.append(sunrise)
 
-sunset = Label(SMALL_FONT, text="sunset")
+sunset = Label(SMALL_FONT, text=" ")
 sunset.anchor_point = (1.0, 0.0)
 sunset.anchored_position = (board.DISPLAY.width - 10, 60)
 sunset.color = ORANGE
@@ -128,25 +127,25 @@ image_group.append(sunset)
 
 description = Label(LARGE_FONT, text=" ")
 description.anchor_point = (0, 0)
-description.anchored_position = (10, 180)
+description.anchored_position = (10, 178)
 description.color = WHITE
 image_group.append(description)
 
 long_desc = Label(SMALL_FONT, text=" ")
 long_desc.anchor_point = (0, 0)
-long_desc.anchored_position = (10, 215)
+long_desc.anchored_position = (10, 210)
 long_desc.color = WHITE
 image_group.append(long_desc)
 
 temperature = Label(LARGE_FONT, text=" ")
 temperature.anchor_point = (1.0, 0)
-temperature.anchored_position = (board.DISPLAY.width - 10, 180)
+temperature.anchored_position = (board.DISPLAY.width - 10, 178)
 temperature.color = WHITE
 image_group.append(temperature)
 
 humidity = Label(SMALL_FONT, text=" ")
 humidity.anchor_point = (1.0, 0)
-humidity.anchored_position = (board.DISPLAY.width - 10, 215)
+humidity.anchored_position = (board.DISPLAY.width - 10, 210)
 humidity.color = PURPLE
 image_group.append(humidity)
 
@@ -157,6 +156,22 @@ display_message.anchored_position = (board.DISPLAY.width // 2, 231)
 image_group.append(display_message)
 
 gc.collect()
+
+
+def am_pm(hour):
+    """Provide an adjusted hour and AM/PM string to create to a
+    12-hour time string.
+    :param int hour: The clock hour. No default."""
+    if hour < 12:
+        return hour, "AM"
+    if hour == 12:
+        return 12, "PM"
+    if hour > 12:
+        hour = hour - 12
+        if hour == 0:
+            return 12, "AM"
+        else:
+            return hour, "PM"
 
 
 def get_last_value(feed_key):
@@ -191,6 +206,7 @@ def toggle_clock_tick():
 
 def update_display():
     """Fetch last values and update the display."""
+    alert("UPDATE CONDITIONS")
     gc.collect()
 
     # Get the local time and provide hour-of-day for is_daytime method
@@ -199,14 +215,8 @@ def update_display():
     except Exception as e:
         print(f"Error fetching local time: {e}")
 
-    if time.localtime().tm_hour > 12:
-        hour = time.localtime().tm_hour - 12
-    else:
-        hour = time.localtime().tm_hour
-    if hour == 0:
-        hour = 12
-
-    display_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
+    hour, suffix = am_pm(time.localtime().tm_hour)
+    display_time = f"{hour:2d}:{time.localtime().tm_min:02d} {suffix}"
     clock_digits.text = display_time
     print(f"Local Time: {display_time}")
 
@@ -236,16 +246,17 @@ def update_display():
     icon_file = f"/icons/{kit_to_map_icon[description.text][1]}{icon_suffix}.bmp"
     print(f"Icon filename: {icon_file}")
 
-    if ICON:
-        image_group.pop(0)
-        icon_image = displayio.OnDiskBitmap(icon_file)
-        icon_bg = displayio.TileGrid(icon_image, pixel_shader=icon_image.pixel_shader)
-        image_group.insert(0, icon_bg)
+    image_group.pop(0)
+    icon_image = displayio.OnDiskBitmap(icon_file)
+    icon_bg = displayio.TileGrid(icon_image, pixel_shader=icon_image.pixel_shader, x=WIDTH//2-80, y=HEIGHT//2-80)
+    image_group.insert(0, icon_bg)
 
     temperature.text = f"{float(get_last_value("weather-temperature")):.0f}°"
     humidity.text = f"{float(get_last_value("weather-humidity")):.0f}% RH"
 
     gc.collect()
+    alert("  READY")
+
 
 def alert(text=""):
     # Place alert message in clock message area. Default is the previous message.
@@ -291,22 +302,15 @@ while True:
 
     # Update weather every SAMPLE_INTERVAL seconds
     if current_time - last_weather_update > SAMPLE_INTERVAL:
-        alert("UPDATING CONDITIONS")
         update_display()
         last_weather_update = current_time
-        alert("READY")
 
     # Update time every second
-    toggle_clock_tick()
-    if time.localtime().tm_hour > 12:
-        hour = time.localtime().tm_hour - 12
-    else:
-        hour = time.localtime().tm_hour
-    if hour == 0:
-        hour = 12
-
-    display_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
+    hour, suffix = am_pm(time.localtime().tm_hour)
+    display_time = f"{hour:2d}:{time.localtime().tm_min:02d} {suffix}"
     clock_digits.text = display_time
 
     adjust_brightness()
-    time.sleep(1)
+    time.sleep(
+        max(min(1.0 - (time.monotonic() - current_time), 1.0), 0)
+    )  # Adjust for processing time
