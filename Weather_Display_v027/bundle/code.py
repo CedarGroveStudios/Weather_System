@@ -22,6 +22,7 @@ import rtc
 import ssl
 import supervisor
 import neopixel
+from simpleio import map_range
 
 from adafruit_datetime import datetime
 import adafruit_connection_manager
@@ -36,7 +37,7 @@ from source_display_graphics import Display
 # TFT Display Parameters
 BRIGHTNESS = 0.50
 ROTATION = 180
-LIGHT_SENSOR = False  # True when ALS-PT19 sensor is connected to board.A3
+LIGHT_SENSOR = True  # True when ALS-PT19 sensor is connected to board.A3
 
 display = Display(rotation=ROTATION, brightness=BRIGHTNESS)
 
@@ -224,7 +225,7 @@ def adjust_brightness():
     new_brightness = round(
         old_brightness + ((target_brightness - old_brightness) / 5), 3
     )
-    disp_brightness(new_brightness)
+    display.brightness = new_brightness
     pixel.brightness = new_brightness
     old_brightness = new_brightness
 
