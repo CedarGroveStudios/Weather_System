@@ -1,16 +1,19 @@
 # SPDX-FileCopyrightText: 2024, 2025 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
-cedargrove_weather_display_code.py
+cedargrove_weather_display_v027/code.py
 
 Displays AIO+ weather conditions to AIO feeds in support of remote workshop
 corrosion monitoring.
 
 For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
+TFT brightness sensor phototransistor is connected to board.A3. Local cooling
+fan control is connected to board.A4.
 """
 
 import board
 import microcontroller
+import analogio
 import digitalio
 import gc
 import os
@@ -33,6 +36,7 @@ from source_display_graphics import Display
 # TFT Display Parameters
 BRIGHTNESS = 0.50
 ROTATION = 180
+LIGHT_SENSOR = False  # True when ALS-PT19 sensor is connected to board.A3
 
 display = Display(rotation=ROTATION, brightness=BRIGHTNESS)
 
@@ -58,10 +62,13 @@ SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 # Internal cooling fan threshold
 FAN_ON_THRESHOLD_F = 100  # Degrees Fahrenheit
 
-# Instantiate cooling fan control (D5)
-fan = digitalio.DigitalInOut(board.D5)
+# Instantiate cooling fan control (A4)
+fan = digitalio.DigitalInOut(board.A4)
 fan.direction = digitalio.Direction.OUTPUT
 fan.value = False  # Initialize with fan off
+
+# Instantiate the ALS-PT19 light sensor
+light_sensor = analogio.AnalogIn(board.A3)
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
@@ -72,8 +79,24 @@ led.value = False
 pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=BRIGHTNESS)
 pixel[0] = STARTUP  # Initializing
 
-# Initialize Heartbeat Indicator Value
+# Initialize Heartbeat Indicator Value and brightness history
 clock_tick = False
+old_brightness = BRIGHTNESS
+
+
+def am_pm(hour):
+    """Provide an adjusted hour and AM/PM string to create to a
+    12-hour time string.
+    :param int hour: The clock hour. No default."""
+    if hour < 12:
+        if hour == 0:
+            hour = 12
+        return hour, "AM"
+    if hour == 12:
+        return 12, "PM"
+    if hour > 12:
+        hour = hour - 12
+    return hour, "PM"
 
 
 def read_cpu_temp():
@@ -164,13 +187,7 @@ def update_local_time():
     except Exception as time_error:
         print(f"  FAIL: Reverting to local time: {time_error}")
 
-    if time.localtime().tm_hour > 12:
-        hour = time.localtime().tm_hour - 12
-    else:
-        hour = time.localtime().tm_hour
-    if hour == 0:
-        hour = 12
-
+    hour, _ = am_pm(time.localtime().tm_hour)
     local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
     display.clock_digits.text = local_time
 
@@ -188,6 +205,28 @@ def update_local_time():
     display.clock_icon_mask.fill = display.LCARS_LT_BLU
     display.wifi_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Normal
+
+
+def adjust_brightness():
+    """Acquire the ALS-PT19 light sensor value and gradually adjust display
+    brightness based on ambient light. The display brightness ranges from 0.05
+    to BRIGHTNESS when the ambient light level falls between 5 and 200 lux.
+    Full-scale raw light sensor value (65535) is approximately 1500 Lux."""
+    global old_brightness
+    if not LIGHT_SENSOR:
+        return
+    raw = 0
+    for i in range(2000):
+        raw = raw + light_sensor.value
+    target_brightness = round(
+        map_range(raw / 2000 / 65535 * 1500, 5, 200, 0.05, BRIGHTNESS), 3
+    )
+    new_brightness = round(
+        old_brightness + ((target_brightness - old_brightness) / 5), 3
+    )
+    disp_brightness(new_brightness)
+    pixel.brightness = new_brightness
+    old_brightness = new_brightness
 
 
 # Connect to Wi-Fi
@@ -232,9 +271,13 @@ except Exception as aio_client_error:
 display.wifi_icon_mask.fill = display.LCARS_LT_BLU
 pixel[0] = NORMAL  # Normal
 
-### PRIMARY LOOP ###
+# ### PRIMARY LOOP ###
 while True:
     print("=" * 35)
+    # Watch for and adjust to ambient light changes
+    adjust_brightness()
+
+    # Update local time display and monitor AIO throttle limit
     update_local_time()
     print(
         f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
@@ -378,24 +421,18 @@ while True:
             table_sunrise = datetime.fromisoformat(forecast_table["sunrise"]).timetuple()
             sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
             if sunrise_hr < 0:
-                sunrise_hr = sunrise_hr + 24
-            if sunrise_hr > 12:
-                sunrise_hr = sunrise_hr - 12
-            if sunrise_hr == 0:
-                sunrise_hr = 12
+                sunrise_hr += 24
+            sunrise_hr, ampm = am_pm(sunrise_hr)
             display.ext_sunrise.text = (
-                f"rise {sunrise_hr:02d}:{table_sunrise.tm_min:02d}"
+                f"rise {sunrise_hr:2d}:{table_sunrise.tm_min:02d}{ampm[0].lower()}"
             )
 
             table_sunset = datetime.fromisoformat(forecast_table["sunset"]).timetuple()
             sunset_hr = table_sunset.tm_hour + os.getenv("TIMEZONE_OFFSET")
             if sunset_hr < 0:
-                sunset_hr = sunset_hr + 24
-            if sunset_hr > 12:
-                sunset_hr = sunset_hr - 12
-            if sunset_hr == 0:
-                sunset_hr = 12
-            display.ext_sunset.text = f"set  {sunset_hr:02d}:{table_sunset.tm_min:02d}"
+                sunset_hr += 24
+            sunset_hr, ampm = am_pm(sunset_hr)
+            display.ext_sunset.text = f"set {sunset_hr:2d}:{table_sunset.tm_min:02d}{ampm[0].lower()}"
 
             weather_table_old = weather_table  # to watch for changes
         else:

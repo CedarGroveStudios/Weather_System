@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024, 2025 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
-source_display_graphics.py
+cedargrove_weather_display_v027/source_display_graphics.py
 
 Builds the display graphics class for the Weather Source and Display devices.
 For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing.
@@ -86,9 +86,9 @@ class Display:
         )
         self.image_group.append(icon)
 
-        ### Define display graphic, label, and mask areas
+        # ### Define display graphic, label, and mask areas
 
-        ## Define masks
+        # ## Define masks
         # Heartbeat Icon Mask
         self.clock_tick_mask = RoundRect(
             458, 297, 10, 11, 1, fill=self.VIOLET, outline=None, stroke=0
@@ -148,7 +148,7 @@ class Display:
         self.status.anchored_position = (89, 200)
         self.image_group.append(self.status)
 
-        ## Define text labels
+        # ## Define text labels
         # Temperature
         self.temperature = Label(ORBITRON_BOLD_24, text=" ", color=self.WHITE)
         self.temperature.anchor_point = (1.0, 0.5)
@@ -205,13 +205,13 @@ class Display:
 
         # Exterior Sunrise
         self.ext_sunrise = Label(ORBITRON_LIGHT_12, text=" ", color=self.YELLOW)
-        self.ext_sunrise.x = 325
+        self.ext_sunrise.x = 320
         self.ext_sunrise.y = 200
         self.image_group.append(self.ext_sunrise)
 
         # Exterior Sunset
         self.ext_sunset = Label(ORBITRON_LIGHT_12, text=" ", color=self.ORANGE)
-        self.ext_sunset.x = 405
+        self.ext_sunset.x = 400
         self.ext_sunset.y = 200
         self.image_group.append(self.ext_sunset)
 
