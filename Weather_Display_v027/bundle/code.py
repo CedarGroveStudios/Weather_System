@@ -35,7 +35,7 @@ from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
 from source_display_graphics import Display
 
 # TFT Display Parameters
-BRIGHTNESS = 0.50
+BRIGHTNESS = 1.0
 ROTATION = 180
 LIGHT_SENSOR = True  # True when ALS-PT19 sensor is connected to board.A3
 
@@ -175,6 +175,9 @@ def busy(delay):
 
         display.pcb_temp.text = f"{gc.mem_free() / 10 ** 6:.3f} Mb  {read_cpu_temp():.0f}°  {SAMPLE_INTERVAL - blinks}"
 
+        # Watch for and adjust to ambient light changes
+        adjust_brightness()
+
         delay = max((1 - (time.monotonic() - start)), 0)
         time.sleep(delay)
 
@@ -219,8 +222,9 @@ def adjust_brightness():
     raw = 0
     for i in range(2000):
         raw = raw + light_sensor.value
+
     target_brightness = round(
-        map_range(raw / 2000 / 65535 * 1500, 5, 200, 0.05, BRIGHTNESS), 3
+        map_range(raw / 2000 / 65535 * 1500, 5, 200, 0.2, BRIGHTNESS), 3
     )
     new_brightness = round(
         old_brightness + ((target_brightness - old_brightness) / 5), 3
@@ -275,8 +279,6 @@ pixel[0] = NORMAL  # Normal
 # ### PRIMARY LOOP ###
 while True:
     print("=" * 35)
-    # Watch for and adjust to ambient light changes
-    adjust_brightness()
 
     # Update local time display and monitor AIO throttle limit
     update_local_time()
@@ -440,7 +442,7 @@ while True:
             print("... waiting for new weather conditions")
 
         print("-" * 35)
-        print(f"NOTE Cooling fan state: {fan.value}  CPU: {read_cpu_temp():.0f}°")
+        print(f"NOTE CPU: {read_cpu_temp():.0f}°    Cooling fan state: {fan.value}")
         print("...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:

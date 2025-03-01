@@ -30,7 +30,8 @@ class Display:
     """ """
 
     def __init__(self, tft="3.5-inch", rotation=180, brightness=0.50):
-        self._backlite = pwmio.PWMOut(board.TX, frequency=500)
+        # 3.5-inch TFT LITE pin is sensitive to PWM frequency
+        self._backlite = pwmio.PWMOut(board.TX, frequency=5000)
         self._backlite.duty_cycle = 0
 
         self._brightness = brightness
@@ -71,7 +72,8 @@ class Display:
         self.bkg_image = displayio.OnDiskBitmap("/LCARS_Weather_v026_480x320.bmp")
         self.bkg = displayio.TileGrid(self.bkg_image, pixel_shader=self.bkg_image.pixel_shader)
 
-        self.DAY_PALETTE = (0xfe9900, 160)
+        self.DAY_PALETTE = (0xfe9910, 160)
+        self.ALERT_PALETTE = (0xff0040, 160)
         self.NIGHT_PALETTE = (self.bkg_image.pixel_shader[18], 0)
 
         self.select_palette(daylight=False, refresh_icons=False)
