@@ -107,8 +107,10 @@ def read_cpu_temp():
     cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
     if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
         fan.value = True
+        display.fan_icon_mask.fill = None
     else:
         fan.value = False
+        display.fan_icon_mask.fill = display.LCARS_LT_BLU
     return cpu_temp_f
 
 
@@ -224,7 +226,7 @@ def adjust_brightness():
         raw = raw + light_sensor.value
 
     target_brightness = round(
-        map_range(raw / 2000 / 65535 * 1500, 5, 200, 0.2, BRIGHTNESS), 3
+        map_range(raw / 2000 / 65535 * 1500, 5, 200, 0.3, BRIGHTNESS), 3
     )
     new_brightness = round(
         old_brightness + ((target_brightness - old_brightness) / 5), 3

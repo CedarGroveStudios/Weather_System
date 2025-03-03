@@ -69,12 +69,12 @@ class Display:
         self.image_group = displayio.Group()
 
         # Background Image; image_group[0]
-        self.bkg_image = displayio.OnDiskBitmap("/LCARS_Weather_v026_480x320.bmp")
+        self.bkg_image = displayio.OnDiskBitmap("/LCARS_Weather_v028_480x320.bmp")
         self.bkg = displayio.TileGrid(self.bkg_image, pixel_shader=self.bkg_image.pixel_shader)
 
         self.DAY_PALETTE = (0xfe9910, 160)
         self.ALERT_PALETTE = (0xff0040, 160)
-        self.NIGHT_PALETTE = (self.bkg_image.pixel_shader[18], 0)
+        self.NIGHT_PALETTE = (self.bkg_image.pixel_shader[9], 0)
 
         self.select_palette(daylight=False, refresh_icons=False)
         self.image_group.append(self.bkg)
@@ -105,7 +105,7 @@ class Display:
 
         # Sensor Heater Icon Mask
         self.heater_icon_mask = Rect(
-            345, 20, 25, 30, fill=self.LCARS_LT_BLU, outline=None, stroke=0
+            350, 20, 22, 30, fill=self.LCARS_LT_BLU, outline=None, stroke=0
         )
         self.image_group.append(self.heater_icon_mask)
 
@@ -115,9 +115,21 @@ class Display:
         )
         self.image_group.append(self.clock_icon_mask)
 
+        # Fan Icon Mask
+        self.fan_icon_mask = Rect(
+            318, 10, 30, 30, fill=self.LCARS_LT_BLU, outline=None, stroke=0
+        )
+        self.image_group.append(self.fan_icon_mask)
+
+        # Quality Icon Mask
+        self.quality_icon_mask = Rect(
+            318, 45, 30, 30, fill=self.LCARS_LT_BLU, outline=None, stroke=0
+        )
+        self.image_group.append(self.quality_icon_mask)
+
         # SD Icon Mask; Also Masks Battery and Speaker Icons
         self.sd_icon_mask = Rect(
-            330, 225, 90, 55, fill=self.LCARS_LT_BLU, outline=None, stroke=0
+            325, 225, 85, 55, fill=self.LCARS_LT_BLU, outline=None, stroke=0
         )
         self.image_group.append(self.sd_icon_mask)
 
@@ -128,7 +140,7 @@ class Display:
         self.image_group.append(self.wifi_icon_mask)
 
         # Data Status Masks
-        self.temp_mask = Rect(295, 82, 20, 18, fill=self.BLACK, outline=None, stroke=0)
+        self.temp_mask = Rect(295, 83, 20, 18, fill=self.BLACK, outline=None, stroke=0)
         self.image_group.append(self.temp_mask)
         self.humid_mask = Rect(295, 105, 20, 18, fill=self.BLACK, outline=None, stroke=0)
         self.image_group.append(self.humid_mask)
@@ -295,22 +307,22 @@ class Display:
         else:
             lcars_palette = self.NIGHT_PALETTE
 
-        filter = PaletteFilter(self.bkg_image.pixel_shader, self.bkg_image.pixel_shader[18], lcars_palette[0],
+        filter = PaletteFilter(self.bkg_image.pixel_shader, self.bkg_image.pixel_shader[9], lcars_palette[0],
                                lcars_palette[1])
         self.bkg.pixel_shader = filter.palette
 
         self.BLACK = filter.palette[0]  # bkg_image palette index 0
-        self.WHITE = filter.palette[31]  # 31
+        self.WHITE = filter.palette[15]  # 31
         self.RED = 0xFF0000
         self.PINK = 0XEF5CA4
         self.ORANGE = 0xFF8811
         self.YELLOW = 0xFFFF00
-        self.LT_GRN = filter.palette[24]  # 24
+        self.LT_GRN = filter.palette[12]  # 24
         self.CYAN = 0x00FFFF
-        self.LCARS_LT_BLU = filter.palette[18]  # 18
+        self.LCARS_LT_BLU = filter.palette[9]  # 18
         self.VIOLET = 0x9900FF
-        self.WIND = filter.palette[25]  # 25
-        self.GUSTS = filter.palette[17]  # 17
+        self.WIND = filter.palette[13]  # 25
+        self.GUSTS = filter.palette[8]  # 17
 
         if refresh_icons:
             if self.wifi_icon_mask:
@@ -323,6 +335,10 @@ class Display:
                 self.heater_icon_mask.fill = self.LCARS_LT_BLU
             if self.sd_icon_mask:
                 self.sd_icon_mask.fill = self.LCARS_LT_BLU
+            if self.fan_icon_mask:
+                self.fan_icon_mask.fill = self.LCARS_LT_BLU
+            if self.quality_icon_mask:
+                self.quality_icon_mask.fill = self.LCARS_LT_BLU
 
     def display_icon(self, desc="Clear", daylight=True):
         if isinstance(daylight, str):
