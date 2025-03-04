@@ -125,9 +125,10 @@ def wind_direction(heading):
     ]
 
 
-def get_last_value(feed_key):
+def get_last_value(feed_key, json=False):
     """Fetch the latest value of the AIO feed.
-    :param str feed_key: The AIO feed key."""
+    :param str feed_key: The AIO feed key.
+    :param bool json: Return json string rather than feed["value"]."""
     pixel[0] = FETCH
     display.wifi_icon_mask.fill = None
     try:
@@ -136,7 +137,10 @@ def get_last_value(feed_key):
             pixel[0] = THROTTLE_DELAY
             time.sleep(1)  # Wait until throttle limit increases
         pixel[0] = FETCH
-        last_value = io.receive_data(feed_key)["value"]
+        if json:
+            last_value = io.receive_data(feed_key)
+        else:
+            last_value = io.receive_data(feed_key)["value"]
     except Exception as aio_feed_error:
         pixel[0] = ERROR
         display.image_group = None
@@ -288,6 +292,20 @@ while True:
         f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
     )
     print("-" * 35)
+
+    # Check AIO Feed Quality
+    q_json = get_last_value("system-watchdog", json=True)
+    created_at_ts = (datetime.fromisoformat(q_json["created_at"]).timestamp()) + (
+                os.getenv("TIMEZONE_OFFSET") * 60 * 60)
+    # print((0, (time.time() - created_at_ts) / 60))  # plot created time delta
+
+    if time.time() - created_at_ts > 10 * 60:
+        # If created time is > 10 min in the past, we have a quality issue
+        print("WARNING: Source Quality Issue; check Weather Source device")
+        display.quality_icon_mask.fill = None
+    else:
+        print("INFO: Source Quality is OK")
+        display.quality_icon_mask.fill = display.LCARS_LT_BLU
 
     # Read the local temperature and humidity sensor
     print("Workshop Conditions")
