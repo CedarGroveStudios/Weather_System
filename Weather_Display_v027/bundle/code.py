@@ -441,21 +441,17 @@ while True:
             print(f"  Gusts {display.ext_gusts.text} MPH")
             display.gusts_mask.fill = None
 
-            table_sunrise = datetime.fromisoformat(forecast_table["sunrise"]).timetuple()
-            sunrise_hr = table_sunrise.tm_hour + os.getenv("TIMEZONE_OFFSET")
-            if sunrise_hr < 0:
-                sunrise_hr += 24
-            sunrise_hr, ampm = am_pm(sunrise_hr)
-            display.ext_sunrise.text = (
-                f"rise {sunrise_hr:2d}:{table_sunrise.tm_min:02d}{ampm[0].lower()}"
-            )
+            sunrise_ts = (datetime.fromisoformat(forecast_table["sunrise"]).timestamp()) + (
+                        os.getenv("TIMEZONE_OFFSET") * 60 * 60)
+            sunrise_tt = datetime.fromtimestamp(sunrise_ts).timetuple()
+            sunrise_hr, ampm = am_pm(sunrise_tt.tm_hour)
+            display.ext_sunrise.text = (f"rise {sunrise_hr:2d}:{sunrise_tt.tm_min:02d}{ampm[0].lower()}")
 
-            table_sunset = datetime.fromisoformat(forecast_table["sunset"]).timetuple()
-            sunset_hr = table_sunset.tm_hour + os.getenv("TIMEZONE_OFFSET")
-            if sunset_hr < 0:
-                sunset_hr += 24
-            sunset_hr, ampm = am_pm(sunset_hr)
-            display.ext_sunset.text = f"set {sunset_hr:2d}:{table_sunset.tm_min:02d}{ampm[0].lower()}"
+            sunset_ts = (datetime.fromisoformat(forecast_table["sunset"]).timestamp()) + (
+                        os.getenv("TIMEZONE_OFFSET") * 60 * 60)
+            sunset_tt = datetime.fromtimestamp(sunset_ts).timetuple()
+            sunset_hr, ampm = am_pm(sunset_tt.tm_hour)
+            display.ext_sunset.text = (f"rise {sunset_hr:2d}:{sunset_tt.tm_min:02d}{ampm[0].lower()}")
 
             weather_table_old = weather_table  # to watch for changes
         else:
