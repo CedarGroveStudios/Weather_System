@@ -303,9 +303,11 @@ while True:
         # If created time is > 10 min in the past, we have a quality issue
         print("WARNING: Source Quality Issue; check Weather Source device")
         display.quality_icon_mask.fill = None
+        display.alert("QUALITY WARN")
     else:
         print("INFO: Source Quality is OK")
         display.quality_icon_mask.fill = display.LCARS_LT_BLU
+        display.alert("QUALITY OK")
 
     # Read the local temperature and humidity sensor
     print("Workshop Conditions")
@@ -451,7 +453,7 @@ while True:
                         os.getenv("TIMEZONE_OFFSET") * 60 * 60)
             sunset_tt = datetime.fromtimestamp(sunset_ts).timetuple()
             sunset_hr, ampm = am_pm(sunset_tt.tm_hour)
-            display.ext_sunset.text = (f"rise {sunset_hr:2d}:{sunset_tt.tm_min:02d}{ampm[0].lower()}")
+            display.ext_sunset.text = (f"set {sunset_hr:2d}:{sunset_tt.tm_min:02d}{ampm[0].lower()}")
 
             weather_table_old = weather_table  # to watch for changes
         else:
