@@ -30,8 +30,12 @@ import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
 
-from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit, fahrenheit_to_celsius
+from cedargrove_temperaturetools.unit_converters import (
+    celsius_to_fahrenheit,
+    fahrenheit_to_celsius,
+)
 from cedargrove_temperaturetools.dew_point import dew_point as dew_point_calc
+from cedargrove_dst_adjuster import _detect_dst as is_dst
 from source_display_graphics import Display
 
 # TFT Display Parameters
@@ -189,6 +193,7 @@ def busy(delay):
 
 
 def update_local_time():
+    global TIMEZONE_OFFSET
     pixel[0] = FETCH  # Busy
     display.clock_icon_mask.fill = None
     display.wifi_icon_mask.fill = None
@@ -196,6 +201,12 @@ def update_local_time():
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
         print(f"  FAIL: Reverting to local time: {time_error}")
+
+    # DST adjustment
+    if is_dst(time.localtime()):
+        TIMEZONE_OFFSET = os.getenv("TIMEZONE_OFFSET") + 1
+    else:
+        TIMEZONE_OFFSET = os.getenv("TIMEZONE_OFFSET")
 
     hour, _ = am_pm(time.localtime().tm_hour)
     local_time = f"{hour:2d}:{time.localtime().tm_min:02d}"
@@ -296,7 +307,8 @@ while True:
     # Check AIO Feed Quality
     q_json = get_last_value("system-watchdog", json=True)
     created_at_ts = (datetime.fromisoformat(q_json["created_at"]).timestamp()) + (
-                os.getenv("TIMEZONE_OFFSET") * 60 * 60)
+        TIMEZONE_OFFSET * 60 * 60
+    )
     # print((0, (time.time() - created_at_ts) / 60))  # plot created time delta
 
     if time.time() - created_at_ts > 10 * 60:
@@ -426,7 +438,8 @@ while True:
 
             table_dew_point = f"{weather_table['temperatureDewPoint']:.0f}"
             display.ext_dew.text = (
-                f"{celsius_to_fahrenheit(float(table_dew_point)):.0f}°")
+                f"{celsius_to_fahrenheit(float(table_dew_point)):.0f}°"
+            )
             print(f"  Dew   {display.ext_dew.text}")
             display.dew_pt_mask.fill = None
             display.temp_mask.fill = None
@@ -443,17 +456,23 @@ while True:
             print(f"  Gusts {display.ext_gusts.text} MPH")
             display.gusts_mask.fill = None
 
-            sunrise_ts = (datetime.fromisoformat(forecast_table["sunrise"]).timestamp()) + (
-                        os.getenv("TIMEZONE_OFFSET") * 60 * 60)
-            sunrise_tt = datetime.fromtimestamp(sunrise_ts).timetuple()
+            sunrise_ts = (
+                datetime.fromisoformat(forecast_table["sunrise"]).timestamp()
+            ) + (TIMEZONE_OFFSET * 60 * 60)
+            sunrise_tt = time.localtime(sunrise_ts)
             sunrise_hr, ampm = am_pm(sunrise_tt.tm_hour)
-            display.ext_sunrise.text = (f"rise {sunrise_hr:2d}:{sunrise_tt.tm_min:02d}{ampm[0].lower()}")
+            display.ext_sunrise.text = (
+                f"rise {sunrise_hr:2d}:{sunrise_tt.tm_min:02d}{ampm[0].lower()}"
+            )
 
-            sunset_ts = (datetime.fromisoformat(forecast_table["sunset"]).timestamp()) + (
-                        os.getenv("TIMEZONE_OFFSET") * 60 * 60)
-            sunset_tt = datetime.fromtimestamp(sunset_ts).timetuple()
+            sunset_ts = (
+                datetime.fromisoformat(forecast_table["sunset"]).timestamp()
+            ) + (TIMEZONE_OFFSET * 60 * 60)
+            sunset_tt = time.localtime(sunset_ts)
             sunset_hr, ampm = am_pm(sunset_tt.tm_hour)
-            display.ext_sunset.text = (f"set {sunset_hr:2d}:{sunset_tt.tm_min:02d}{ampm[0].lower()}")
+            display.ext_sunset.text = (
+                f"set {sunset_hr:2d}:{sunset_tt.tm_min:02d}{ampm[0].lower()}"
+            )
 
             weather_table_old = weather_table  # to watch for changes
         else:
