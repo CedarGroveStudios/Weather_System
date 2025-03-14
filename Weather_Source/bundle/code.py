@@ -16,6 +16,7 @@ import board
 import microcontroller
 import digitalio
 import displayio
+import analogio
 import os
 import time
 import rtc
@@ -26,11 +27,12 @@ import adafruit_connection_manager
 import wifi
 import adafruit_requests
 from adafruit_io.adafruit_io import IO_HTTP
-# import adafruit_ili9341  # 2.4" TFT FeatherWing
 import adafruit_hx8357  # 3.5" TFT FeatherWing
 import adafruit_am2320  # I2C temperature/humidity sensor; indoor
+
 # import adafruit_sht31d  # I2C temperature/humidity sensor; indoor/outdoor
 import pwmio
+from simpleio import map_range
 
 # Temperature Converter Helpers
 from cedargrove_temperaturetools.unit_converters import celsius_to_fahrenheit
@@ -44,6 +46,7 @@ XMIT_SENSOR:  True to read local sensor data and send to AIO feeds
 """
 XMIT_WEATHER = True
 XMIT_SENSOR = True
+
 SAMPLE_INTERVAL = 240  # Check sensor and AIO Weather (seconds)
 
 # TFT Display Parameters
@@ -59,14 +62,7 @@ WEEKDAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", ]
 # fmt: on
 
-## Instantiate Local Peripherals
-"""# Instantiate the 2.4" TFT FeatherWing Display
-displayio.release_displays()  # Release display resources
-display_bus = displayio.FourWire(
-    board.SPI(), command=board.D10, chip_select=board.D9, reset=None
-)
-display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)"""
-
+# ### Instantiate Local Peripherals
 # Instantiate the 3.5" TFT FeatherWing Display
 displayio.release_displays()  # Release display resources
 display_bus = displayio.FourWire(
@@ -81,10 +77,13 @@ lite.duty_cycle = int(BRIGHTNESS * 0xFFFF)
 # Split the screen
 # supervisor.reset_terminal(display.width//2, display.height)
 
-# Instantiate cooling fan control (D5)
-fan = digitalio.DigitalInOut(board.D5)  # D4 Stemma 3-pin connector
+# Instantiate cooling fan control (A4)
+fan = digitalio.DigitalInOut(board.A4)
 fan.direction = digitalio.Direction.OUTPUT
 fan.value = False  # Initialize with fan off
+
+# Instantiate the ALS-PT19 light sensor
+# light_sensor = analogio.AnalogIn(board.A3)
 
 # Instantiate the Red LED
 led = digitalio.DigitalInOut(board.LED)
@@ -99,6 +98,9 @@ pixel[0] = 0xFF00FF  # Initializing (purple)
 # corrosion_sensor = adafruit_sht31d.SHT31D(board.I2C())  # outdoor sensor
 corrosion_sensor = adafruit_am2320.AM2320(board.I2C())  # indoor sensor
 corrosion_sensor.heater = False  # turn heater OFF
+
+# Initialize brightness history
+old_brightness = BRIGHTNESS
 
 
 def read_local_sensor():
@@ -303,10 +305,10 @@ while True:
     sens_heat = corrosion_sensor.heater
 
     publish_to_aio(
-                int(round(time.monotonic() / 60, 0)),
-                "system-watchdog",
-                xmit=XMIT_SENSOR,
-            )
+        int(round(time.monotonic() / 60, 0)),
+        "system-watchdog",
+        xmit=XMIT_SENSOR,
+    )
 
     # Publish local sensor data
     publish_to_aio(sens_temp, "shop.int-temperature", xmit=XMIT_SENSOR)
@@ -314,7 +316,9 @@ while True:
     publish_to_aio(sens_dew_pt, "shop.int-dewpoint", xmit=XMIT_SENSOR)
     publish_to_aio(sens_index, "shop.int-corrosion-index", xmit=XMIT_SENSOR)
     publish_to_aio(str(sens_heat), "shop.int-sensor-heater-on", xmit=XMIT_SENSOR)
-    publish_to_aio(f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR)
+    publish_to_aio(
+        f"{read_cpu_temp():.2f}", "shop.int-pcb-temperature", xmit=XMIT_SENSOR
+    )
     print("-" * 35)
 
     # Receive and update the conditions from AIO+ Weather
