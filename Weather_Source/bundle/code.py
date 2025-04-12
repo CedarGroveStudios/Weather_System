@@ -241,7 +241,12 @@ def update_local_time():
     try:
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
-        print(f"  FAIL: Reverting to local time: {time_error}")
+        pixel[0] = 0xFF0000  # Error (red)
+        display.image_group = None
+        print(f"  FAIL: Update Local Time: {time_error}")
+        print("    MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
 
     local_time = f"{time.localtime().tm_hour:2d}:{time.localtime().tm_min:02d}"
     wday = time.localtime().tm_wday
@@ -295,9 +300,18 @@ pixel[0] = 0x00FFFF  # Normal (green)
 while True:
     print("=" * 35)
     update_local_time()
-    print(
-        f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
-    )
+    try:
+        print(
+            f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
+        )
+    except Exception as get_throttle_error:
+        pixel[0] = 0xFF0000  # Error (red)
+        print("FAIL: Get Throttle Limit")
+        print(f"  {str(get_throttle_error)}")
+        print("  MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
+
     print("-" * 35)
 
     # Read the local temperature and humidity sensor

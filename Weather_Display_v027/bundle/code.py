@@ -200,7 +200,12 @@ def update_local_time():
     try:
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
-        print(f"  FAIL: Reverting to local time: {time_error}")
+        pixel[0] = ERROR  # Error
+        display.image_group = None
+        print(f"  FAIL: Update Local Time: {time_error}")
+        print("    MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
 
     # DST adjustment
     if is_dst(time.localtime()):
@@ -299,10 +304,19 @@ while True:
 
     # Update local time display and monitor AIO throttle limit
     update_local_time()
-    print(
-        f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
-    )
-    print("-" * 35)
+    try:
+        print(
+            f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
+        )
+        print("-" * 35)
+    except Exception as get_throttle_error:
+        pixel[0] = ERROR
+        display.image_group = None
+        print("FAIL: Get Throttle Limit")
+        print(f"  {str(get_throttle_error)}")
+        print("  MCU will soft reset in 30 seconds.")
+        busy(30)
+        supervisor.reload()  # soft reset: keeps the terminal session alive
 
     # Check AIO Feed Quality
     q_json = get_last_value("system-watchdog", json=True)
