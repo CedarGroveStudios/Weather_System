@@ -106,13 +106,14 @@ def am_pm(hour):
 
 def read_cpu_temp():
     """Read the ESP32-S3 internal CPU temperature sensor and turn on
-    fan if threshold is exceeded.
+    fan if threshold is exceeded. Turns fan off when temperature is
+    three degrees less than the threshold.
     Nominal operating range is -40C to 85C (-40F to 185F)."""
-    cpu_temp_f = celsius_to_fahrenheit(microcontroller.cpu.temperature)
-    if cpu_temp_f > FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
+    cpu_temp_f = round(celsius_to_fahrenheit(microcontroller.cpu.temperature),0)
+    if cpu_temp_f >= FAN_ON_THRESHOLD_F:  # Turn on cooling fan if needed
         fan.value = True
         display.fan_icon_mask.fill = None
-    else:
+    elif cpu_temp_f <= FAN_ON_THRESHOLD_F - 3:
         fan.value = False
         display.fan_icon_mask.fill = display.LCARS_LT_BLU
     return cpu_temp_f
@@ -146,13 +147,7 @@ def get_last_value(feed_key, json=False):
         else:
             last_value = io.receive_data(feed_key)["value"]
     except Exception as aio_feed_error:
-        pixel[0] = ERROR
-        display.image_group = None
-        print(f"FAIL: <- {feed}")
-        print(f"  {str(aio_feed_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=aio_feed_error, desc="AIO feed")
     display.wifi_icon_mask.fill = display.LCARS_LT_BLU
     pixel[0] = NORMAL  # Success
     return last_value
@@ -192,6 +187,21 @@ def busy(delay):
         time.sleep(delay)
 
 
+def soft_reset(error, desc="", delay=30):
+    """Soft reset of MCU. The terminal session and system time are preserved.
+    Display switches to REPL and displays error code string.
+    :param Exception error: The exception error string. No default.
+    :param str desc: The error description string. Defaults to blank string.
+    :param int delay: The time delay before soft reset (seconds). Defaults
+    to 30 seconds."""
+    pixel[0] = ERROR  # Light NeoPixel with error color
+    display.image_group = None  # Show the REPL
+    print(f"  FAIL: {desc} Error: {str(error)}")
+    print(f"    MCU will soft reset in {delay} seconds.")
+    busy(delay)
+    supervisor.reload()  # soft reset: keeps the terminal session alive
+
+
 def update_local_time():
     global TIMEZONE_OFFSET
     pixel[0] = FETCH  # Busy
@@ -200,12 +210,7 @@ def update_local_time():
     try:
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
-        pixel[0] = ERROR  # Error
-        display.image_group = None
-        print(f"  FAIL: Update Local Time: {time_error}")
-        print("    MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=time_error, desc="Time")
 
     # DST adjustment
     if is_dst(time.localtime()):
@@ -267,12 +272,7 @@ try:
     )
     print("  CONNECTED to WiFi")
 except Exception as wifi_access_error:
-    pixel[0] = ERROR  # Error
-    display.image_group = None
-    print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
-    print("    MCU will soft reset in 30 seconds.")
-    busy(30)
-    supervisor.reload()  # soft reset: keeps the terminal session alive
+    soft_reset(error=wifi_access_error, desc="WiFi Access")
 display.wifi_icon_mask.fill = display.LCARS_LT_BLU
 pixel[0] = NORMAL  # Success
 
@@ -289,12 +289,7 @@ try:
     requests = adafruit_requests.Session(pool, ssl.create_default_context())
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
 except Exception as aio_client_error:
-    pixel[0] = ERROR  # Error
-    display.image_group = None
-    print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
-    print("    MCU will soft reset in 30 seconds.")
-    busy(30)
-    supervisor.reload()  # soft reset: keeps the terminal session alive
+    soft_reset(error=aio_client_error, desc="AIO Client")
 display.wifi_icon_mask.fill = display.LCARS_LT_BLU
 pixel[0] = NORMAL  # Normal
 
@@ -304,19 +299,10 @@ while True:
 
     # Update local time display and monitor AIO throttle limit
     update_local_time()
-    try:
-        print(
-            f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
-        )
-        print("-" * 35)
-    except Exception as get_throttle_error:
-        pixel[0] = ERROR
-        display.image_group = None
-        print("FAIL: Get Throttle Limit")
-        print(f"  {str(get_throttle_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+    print(
+        f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
+    )
+    print("-" * 35)
 
     # Check AIO Feed Quality
     q_json = get_last_value("system-watchdog", json=True)
@@ -410,12 +396,7 @@ while True:
         pixel[0] = FETCH
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
     except Exception as receive_weather_error:
-        pixel[0] = ERROR  # Error (red)
-        display.image_group = None
-        print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=receive_weather_error, desc="AIO+ Weather")
 
     # print(weather_table)  # This is a very large json table
     # print("... weather table received ...")

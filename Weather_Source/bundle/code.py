@@ -16,7 +16,7 @@ import board
 import microcontroller
 import digitalio
 import displayio
-import analogio
+# import analogio  # for local sensor input
 import os
 import time
 import rtc
@@ -111,11 +111,8 @@ def read_local_sensor():
     try:
         temp_c = corrosion_sensor.temperature
     except (Exception, OSError) as read_sensor_error:
-        print("FAIL: Read Sensor Error")
-        print(f"  {str(read_sensor_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=read_sensor_error, desc="Read Sensor")
+
     if temp_c is not None:
         temp_c = min(max(temp_c, -40), 125)  # constrain value
         temp_c = round(temp_c, 1)  # Celsius
@@ -126,11 +123,8 @@ def read_local_sensor():
     try:
         humid_pct = corrosion_sensor.relative_humidity
     except Exception as read_sensor_error:
-        print("FAIL: Read Sensor Error")
-        print(f"  {str(read_sensor_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=read_sensor_error, desc="Read Sensor")
+
     if humid_pct is not None:
         humid_pct = min(max(humid_pct, 0), 100)  # constrain value
         humid_pct = round(humid_pct, 1)
@@ -174,6 +168,21 @@ def read_cpu_temp():
     return cpu_temp_f
 
 
+def soft_reset(error="", desc="", delay=30):
+    """Soft reset of MCU. The terminal session and system time are preserved.
+    Display switches to REPL and displays error code string.
+    :param union(Exception, str) error: The exception error string. Defaults to blank string.
+    :param str desc: The error description string. Defaults to blank string.
+    :param int delay: The time delay before soft reset (seconds). Defaults
+    to 30 seconds."""
+    pixel[0] = ERROR  # Light NeoPixel with error color
+    display.image_group = None  # Show the REPL
+    print(f"  FAIL: {desc} Error: {str(error)}")
+    print(f"    MCU will soft reset in {delay} seconds.")
+    busy(delay)
+    supervisor.reload()  # soft reset: keeps the terminal session alive
+
+
 def display_brightness(brightness=1.0):
     """Set the TFT display brightness.
     :param float brightness: The display brightness.
@@ -208,13 +217,10 @@ def publish_to_aio(value, feed, xmit=True):
                 io.send_data(feed, value)
                 pixel[0] = 0x00FF00  # Success (green)
                 print(f"SEND '{value}' -> {feed}")
-            except Exception as aio_publish_error:
-                pixel[0] = 0xFF0000  # Error (red)
-                print(f"FAIL: '{value}' -> {feed}")
-                print(f"  {str(aio_publish_error)}")
-                print("  MCU will soft reset in 30 seconds.")
-                busy(30)
-                supervisor.reload()  # soft reset: keeps the terminal session alive
+            except:
+                """If AIO is unavailable, a recognizable error code for a throttle query
+                   is not provided; a broad exception is used to capture the error."""
+                soft_reset(error="", desc="AIO Publish or Throttle Query")
         else:
             print(f"DISP '{value}' {feed}")
             pixel[0] = 0x00FF00  # Success (green)
@@ -241,12 +247,7 @@ def update_local_time():
     try:
         rtc.RTC().datetime = time.struct_time(io.receive_time(os.getenv("TIMEZONE")))
     except Exception as time_error:
-        pixel[0] = 0xFF0000  # Error (red)
-        display.image_group = None
-        print(f"  FAIL: Update Local Time: {time_error}")
-        print("    MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+        soft_reset(error=time_error, desc="Update Local Time")
 
     local_time = f"{time.localtime().tm_hour:2d}:{time.localtime().tm_min:02d}"
     wday = time.localtime().tm_wday
@@ -269,11 +270,7 @@ try:
     pixel[0] = 0x00FF00  # Success (green)
     print("  CONNECTED to WiFi")
 except Exception as wifi_access_error:
-    pixel[0] = 0xFF0000  # Error (red)
-    print(f"  FAIL: WiFi connect \n    Error: {wifi_access_error}")
-    print("    MCU will soft reset in 30 seconds.")
-    busy(30)
-    supervisor.reload()  # soft reset: keeps the terminal session alive
+    soft_reset(error=wifi_access_error, desc="WiFi Access")
 
 # Initialize the weather_table and history variables
 weather_table = None
@@ -289,14 +286,11 @@ try:
     requests = adafruit_requests.Session(pool, ssl.create_default_context())
     io = IO_HTTP(os.getenv("AIO_USERNAME"), os.getenv("AIO_KEY"), requests)
 except Exception as aio_client_error:
-    pixel[0] = 0xFF0000  # Error (red)
-    print(f"  FAIL: AIO HTTP client connect \n    Error: {aio_client_error}")
-    print("    MCU will soft reset in 30 seconds.")
-    busy(30)
-    supervisor.reload()  # soft reset: keeps the terminal session alive
+    soft_reset(error=aio_client_error, desc="AIO Client")
+
 pixel[0] = 0x00FFFF  # Normal (green)
 
-### PRIMARY LOOP ###
+# ### PRIMARY LOOP ###
 while True:
     print("=" * 35)
     update_local_time()
@@ -304,13 +298,10 @@ while True:
         print(
             f"Throttle Remain/Limit: {io.get_remaining_throttle_limit()}/{io.get_throttle_limit()}"
         )
-    except Exception as get_throttle_error:
-        pixel[0] = 0xFF0000  # Error (red)
-        print("FAIL: Get Throttle Limit")
-        print(f"  {str(get_throttle_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+    except:
+        """If AIO is unavailable, a recognizable error code for a throttle query
+           is not provided; a broad exception is used to capture the error."""
+        soft_reset(error="", desc="AIO Throttle Query")
 
     print("-" * 35)
 
@@ -343,12 +334,10 @@ while True:
         weather_table = io.receive_weather(os.getenv("WEATHER_TOPIC_KEY"))
         # print(weather_table)  # This is a very large json table
         pixel[0] = 0x00FF00  # Success (green)
-    except Exception as receive_weather_error:
-        pixel[0] = 0xFF0000  # Error (red)
-        print(f"FAIL: receive weather from AIO+ \n  {str(receive_weather_error)}")
-        print("  MCU will soft reset in 30 seconds.")
-        busy(30)
-        supervisor.reload()  # soft reset: keeps the terminal session alive
+    except:
+        """If AIO is unavailable, a recognizable error code for a throttle query
+           is not provided; a broad exception is used to capture the error."""
+        soft_reset(error="", desc="AIO+ Weather or Throttle Query")
 
     if weather_table:
         if weather_table != weather_table_old:
