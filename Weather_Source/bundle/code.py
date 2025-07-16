@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 JG for Cedar Grove Maker Studios
+# SPDX-FileCopyrightText: 2024, 2025 JG for Cedar Grove Maker Studios
 # SPDX-License-Identifier: MIT
 """
 cedargrove_weather_source_http.py
