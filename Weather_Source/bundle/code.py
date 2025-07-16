@@ -175,7 +175,7 @@ def soft_reset(error="", desc="", delay=30):
     :param str desc: The error description string. Defaults to blank string.
     :param int delay: The time delay before soft reset (seconds). Defaults
     to 30 seconds."""
-    pixel[0] = ERROR  # Light NeoPixel with error color
+    pixel[0] = 0xFF0000  # Light NeoPixel with error color (red)
     display.image_group = None  # Show the REPL
     print(f"  FAIL: {desc} Error: {str(error)}")
     print(f"    MCU will soft reset in {delay} seconds.")
