@@ -13,6 +13,7 @@ https://github.com/adafruit/Adafruit_CircuitPython_AdafruitIO/blob/main/examples
 """
 
 import board
+import fourwire
 import microcontroller
 import digitalio
 import displayio
@@ -65,7 +66,7 @@ MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "
 # ### Instantiate Local Peripherals
 # Instantiate the 3.5" TFT FeatherWing Display
 displayio.release_displays()  # Release display resources
-display_bus = displayio.FourWire(
+display_bus = fourwire.FourWire(
     board.SPI(), command=board.D10, chip_select=board.D9, reset=None
 )
 display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)

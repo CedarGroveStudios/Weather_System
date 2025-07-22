@@ -8,6 +8,7 @@ For the Adafruit ESP32-S3 4Mb/2Mb Feather with attached 3.5-inch TFT FeatherWing
 """
 
 import board
+import fourwire
 import displayio
 import gc
 import time
@@ -60,7 +61,7 @@ class Display:
             import adafruit_ili9341  # 2.4" TFT FeatherWing
 
             displayio.release_displays()  # Release display resources
-            display_bus = displayio.FourWire(
+            display_bus = fourwire.FourWire(
                 board.SPI(), command=board.D10, chip_select=board.D9, reset=None
             )
             self._display = adafruit_ili9341.ILI9341(display_bus, width=320, height=240)
@@ -69,7 +70,7 @@ class Display:
             import adafruit_hx8357  # 3.5" TFT FeatherWing
 
             displayio.release_displays()  # Release display resources
-            display_bus = displayio.FourWire(
+            display_bus = fourwire.FourWire(
                 board.SPI(), command=board.D10, chip_select=board.D9, reset=None
             )
             self._display = adafruit_hx8357.HX8357(display_bus, width=480, height=320)
