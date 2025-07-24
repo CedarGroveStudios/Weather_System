@@ -340,42 +340,48 @@ while True:
            is not provided; a broad exception is used to capture the error."""
         soft_reset(error="", desc="AIO+ Weather or Throttle Query")
 
-    if weather_table:
+    if weather_table is not None:
         if weather_table != weather_table_old:
-            table_desc = weather_table["current"]["conditionCode"]
-            table_temp = (
-                f"{celsius_to_fahrenheit(weather_table['current']['temperature']):.1f}"
-            )
-            table_humid = f"{weather_table['current']['humidity'] * 100:.1f}"
-            table_wind_speed = f"{weather_table['current']['windSpeed'] * 0.6214:.1f}"
-            table_wind_dir = wind_direction(weather_table["current"]["windDirection"])
-            table_wind_gusts = f"{weather_table['current']['windGust'] * 0.6214:.1f}"
-            table_timestamp = weather_table["current"]["metadata"]["readTime"]
-            table_daylight = weather_table["current"]["daylight"]
+            try:
+                table_desc = weather_table["current"]["conditionCode"]
+                table_temp = (
+                    f"{celsius_to_fahrenheit(weather_table['current']['temperature']):.1f}"
+                )
+                table_humid = f"{weather_table['current']['humidity'] * 100:.1f}"
+                table_wind_speed = f"{weather_table['current']['windSpeed'] * 0.6214:.1f}"
+                table_wind_dir = wind_direction(weather_table["current"]["windDirection"])
+                table_wind_gusts = f"{weather_table['current']['windGust'] * 0.6214:.1f}"
+                table_timestamp = weather_table["current"]["metadata"]["readTime"]
+                table_daylight = weather_table["current"]["daylight"]
 
-            # Publish table data
-            publish_to_aio(
-                int(round(time.monotonic() / 60, 0)),
-                "system-watchdog",
-                xmit=XMIT_WEATHER,
-            )
-            publish_to_aio(table_desc, "weather-description", xmit=XMIT_WEATHER)
-            publish_to_aio(table_humid, "weather-humidity", xmit=XMIT_WEATHER)
-            publish_to_aio(table_temp, "weather-temperature", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_dir, "weather-winddirection", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
-            publish_to_aio(table_wind_speed, "weather-windspeed", xmit=XMIT_WEATHER)
-            publish_to_aio(str(table_daylight), "weather-daylight", xmit=XMIT_WEATHER)
+                # Publish table data
+                publish_to_aio(
+                    int(round(time.monotonic() / 60, 0)),
+                    "system-watchdog",
+                    xmit=XMIT_WEATHER,
+                )
+                publish_to_aio(table_desc, "weather-description", xmit=XMIT_WEATHER)
+                publish_to_aio(table_humid, "weather-humidity", xmit=XMIT_WEATHER)
+                publish_to_aio(table_temp, "weather-temperature", xmit=XMIT_WEATHER)
+                publish_to_aio(table_wind_dir, "weather-winddirection", xmit=XMIT_WEATHER)
+                publish_to_aio(table_wind_gusts, "weather-windgusts", xmit=XMIT_WEATHER)
+                publish_to_aio(table_wind_speed, "weather-windspeed", xmit=XMIT_WEATHER)
+                publish_to_aio(str(table_daylight), "weather-daylight", xmit=XMIT_WEATHER)
 
-            weather_table_old = weather_table  # to watch for changes
+                weather_table_old = weather_table  # to watch for changes
+            except:
+                w_topic_desc = os.getenv("WEATHER_TOPIC_DESC")
+                print("  weather_table fetch ERROR:")
+                print(f"  ... waiting 30 sec for conditions from {w_topic_desc}")
+                busy(30)  # Try again in 30 seconds
         else:
-            print("... waiting for new weather conditions")
+            print("  ... waiting for new weather conditions")
 
         print("-" * 35)
-        print(f"NOTE Cooling fan state: {fan.value}")
-        print("...")
+        print(f"... NOTE: Cooling fan state: {fan.value}")
+        print(f"... NORMAL: next weather check in {SAMPLE_INTERVAL} sec ...")
         busy(SAMPLE_INTERVAL)  # Wait before checking sensor and AIO Weather
     else:
         w_topic_desc = os.getenv("WEATHER_TOPIC_DESC")
-        print(f"  ... waiting for conditions from {w_topic_desc}")
+        print(f"  ... waiting 10 sec for conditions from {w_topic_desc}")
         busy(10)  # Step up query rate when first starting
